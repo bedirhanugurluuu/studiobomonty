@@ -76,10 +76,10 @@ const FeaturedProjects = ({ initialProjects = [] }: FeaturedProjectsProps) => {
 		activeMediaUrl.toLowerCase().endsWith(".mov");
 
 	return (
-		<section id="featured-projects" className="p-4">
+		<section id="featured-projects" className="p-4 mb-20 md:mb-1">
 
 			<div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-				<div className="relative py-90">
+				<div className="relative py-10 md:py-90">
 					<div className="flex flex-col space-y-[150px]">
 						{projects.map((project, index) => (
 							<div
@@ -109,8 +109,8 @@ const FeaturedProjects = ({ initialProjects = [] }: FeaturedProjectsProps) => {
 					</div>
 				</div>
 
-				<div className="relative ">
-					<div className="sticky top-0 flex h-screen w-full items-center justify-center">
+				<div className="relative">
+					<div className="relative md:sticky top-0 flex md:h-screen w-full items-center justify-center">
 						<div className="relative w-full overflow-hidden rounded-[10px] bg-black/20">
 							{activeIsVideo ? (
 								<video

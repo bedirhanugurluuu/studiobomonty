@@ -122,7 +122,7 @@ export default function ProjectsPage({ projects }: Props) {
               position: "fixed",
               width: "168px",
               height: "210px",
-              aspectRatio: 0.8 / 1,
+              aspectRatio: 2000 / 1333,
             }}
           >
             {hoveredMedia.type === "video" ? (
@@ -132,10 +132,10 @@ export default function ProjectsPage({ projects }: Props) {
                 muted
                 loop
                 preload="none"
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover rounded-[10px]"
                 playsInline
                 controls={false}
-                style={{aspectRatio: 0.8 / 1,}}
+                style={{aspectRatio: 2000 / 1333,}}
               />
             ) : (
               <Image
@@ -143,9 +143,9 @@ export default function ProjectsPage({ projects }: Props) {
                 alt="Preview"
                 width={200}
                 height={120}
-                className="object-cover"
+                className="object-cover rounded-[10px]"
                 loading="lazy"
-                style={{aspectRatio: 0.8 / 1,}}
+                style={{aspectRatio: 2000 / 1333,}}
               />
             )}
           </motion.div>
@@ -156,7 +156,7 @@ export default function ProjectsPage({ projects }: Props) {
       {viewMode === "grid" && (
         <motion.div layout className="grid lg:grid-cols-3 md:grid-cols-2 sm:grid-cols-1 gap-5">
           {projects.map((project, i) => {
-            const media = normalizeMedia(project.thumbnail_media || "");
+            const media = normalizeMedia(project.banner_media || "");
 
             return (
               <Link key={project.id} href={`/projects/${project.slug}`} passHref >
@@ -164,8 +164,8 @@ export default function ProjectsPage({ projects }: Props) {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
-                  className="group relative overflow-hidden block cursor-pointer"
-                  style={{ aspectRatio: 0.8 / 1 }}
+                  className="group relative overflow-hidden block cursor-pointer rounded-[10px]"
+                  style={{ aspectRatio: 2000 / 1333 }}
                 >
                   {media.type === "video" ? (
                     <video
@@ -175,7 +175,7 @@ export default function ProjectsPage({ projects }: Props) {
                       loop
                       controls={false}
                       playsInline
-                      className="w-full object-cover h-full"
+                      className="w-full object-cover h-full rounded-[10px]"
                     />
                   ) : media.type === "image" ? (
                     <Image
@@ -183,7 +183,7 @@ export default function ProjectsPage({ projects }: Props) {
                       alt={project.title}
                       width={600}
                       height={400}
-                      className="w-full object-cover h-full scale-105 group-hover:scale-100 transition-transform duration-500"
+                      className="w-full object-cover h-full scale-105 group-hover:scale-100 transition-transform duration-500 rounded-[10px]"
                     />
                   ) : (
                     <div className="w-full bg-gray-200 flex items-center justify-center">

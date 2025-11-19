@@ -126,7 +126,7 @@ export default function Header() {
   return (
     <header
       className={clsx(
-        "fixed left-1/2 top-6 z-[80] w-full max-w-[680px] -translate-x-1/2 transition-all duration-500",
+        "fixed left-1/2 top-4 md:top-6 z-[80] px-4 md:p-0 w-full max-w-[680px] -translate-x-1/2 transition-all duration-500",
         menuOpen && "pb-6"
       )}
     >
