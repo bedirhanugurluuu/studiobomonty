@@ -1,0 +1,15 @@
+# Admin panel ayrı bir Vercel projesi olarak deploy edilir
+temp-admin-panel/
+
+# Diğer dosyalar
+temp-api-backup/
+scripts/
+database_setup.sql
+env.example
+env.production.example
+*.md
+!README.md
+!DEPLOYMENT.md
+.git/
+node_modules/
+.next/
