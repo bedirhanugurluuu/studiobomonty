@@ -325,7 +325,6 @@ const ClientsSection = ({ initialClientsSettings = null, initialClients = [] }: 
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [intersectionRatios, setIntersectionRatios] = useState<Map<number, number>>(new Map());
-  const [isMobile, setIsMobile] = useState(false);
   const sectionRef = useRef<HTMLElement | null>(null);
   const clientRowRefs = useRef<(HTMLDivElement | null)[]>([]);
   const imageContainerRef = useRef<HTMLDivElement | null>(null);
@@ -344,19 +343,12 @@ const ClientsSection = ({ initialClientsSettings = null, initialClients = [] }: 
     }
   }, [initialClientsSettings, initialClients.length]);
 
-  // Set isMobile on client-side only
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
   // IntersectionObserver for mobile scroll-based active client
   useEffect(() => {
-    if (clients.length === 0 || !isMobile) return;
+    if (clients.length === 0) return;
+
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+    if (!isMobile) return; // Only for mobile
 
     const ratios = new Map<number, number>();
 
@@ -425,10 +417,11 @@ const ClientsSection = ({ initialClientsSettings = null, initialClients = [] }: 
         if (el) clientObserver.unobserve(el);
       });
     };
-  }, [clients.length, isMobile]);
+  }, [clients.length]);
 
   // Desktop hover effect
   useEffect(() => {
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
     if (isMobile) return; // Only for desktop
 
     if (hoveredIndex !== null && clientRowRefs.current[hoveredIndex]) {
@@ -513,10 +506,11 @@ const ClientsSection = ({ initialClientsSettings = null, initialClients = [] }: 
         }
       }
     }
-  }, [hoveredIndex, isMobile]);
+  }, [hoveredIndex]);
 
   if (!settings || clients.length === 0) return null;
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
   const activeClient = isMobile 
     ? (activeIndex !== null ? clients[activeIndex] : null)
     : (hoveredIndex !== null ? clients[hoveredIndex] : null);
@@ -598,7 +592,7 @@ const ClientsSection = ({ initialClientsSettings = null, initialClients = [] }: 
 
         {/* Right: Mobile Sticky Media Preview */}
         {isMobile && (
-          <div className="banner-sticky-client">
+          <div className="banner-sticky-">
             <div className="sticky top-[100px] flex w-full items-center justify-center">
               <div className="relative w-full overflow-hidden rounded-[10px] bg-black/20">
                 {activeIndex !== null && activeMediaUrl ? (
@@ -653,6 +647,7 @@ const LatestProjectsBannerSection = ({ initialBanner = null }: LatestProjectsBan
   const [banner, setBanner] = useState<LatestProjectsBanner | null>(initialBanner);
 
   useEffect(() => {
+    
     if (!initialBanner) {
       fetchLatestProjectsBanner()
         .then((data) => {
@@ -667,7 +662,7 @@ const LatestProjectsBannerSection = ({ initialBanner = null }: LatestProjectsBan
   if (!banner) return null;
 
   return (
-    <section className="px-4 py-10 md:py-24">
+    <section className="px-4 py-24">
       <div className="relative w-full">
         {banner.image_path && (
           <div className="w-full">
@@ -680,12 +675,12 @@ const LatestProjectsBannerSection = ({ initialBanner = null }: LatestProjectsBan
             />
           </div>
         )}
-        <div className="absolute bottom-0 left-0 p-4 md:p-8 flex flex-col gap-2">
-          <h2 className="text-xl lg:text-3xl uppercase font-medium text-white">{banner.title}</h2>
-          <p className="text-sm md:text-md text-white/50 max-w-xs" style={{ lineHeight: "1" }}>{banner.subtitle}</p>
+        <div className="absolute bottom-0 left-0 p-6 md:p-8 flex flex-col gap-2">
+          <h2 className="text-2xl lg:text-3xl uppercase font-medium text-white">{banner.title}</h2>
+          <p className="text-md text-white/50 max-w-xs" style={{ lineHeight: "1" }}>{banner.subtitle}</p>
           <Link
             href="/projects"
-            className="group relative inline-flex items-center mt-3 text-xs md:text-sm uppercase tracking-wider text-white"
+            className="group relative inline-flex items-center mt-3 text-sm uppercase tracking-wider text-white"
           >
             <span className="relative inline-block">
               view work

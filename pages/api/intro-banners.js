@@ -20,6 +20,15 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
+      // Check if environment variables are set
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        console.error('Missing Supabase environment variables');
+        return res.status(500).json({ 
+          error: 'Server configuration error',
+          details: 'Missing Supabase credentials'
+        });
+      }
+
       const { data, error } = await supabase
         .from('intro_banners')
         .select('*')
@@ -27,7 +36,10 @@ export default async function handler(req, res) {
         .limit(1)
         .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error && error.code !== 'PGRST116') {
+        console.error('Supabase error:', error);
+        throw error;
+      }
       res.json(data ?? null);
       return;
     }

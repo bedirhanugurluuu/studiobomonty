@@ -224,58 +224,31 @@ const FeaturedProjects = ({ initialProjects = [] }: FeaturedProjectsProps) => {
 									alignSelf: 'unset',
 								}}
 							>
-							<div className="relative w-full h-full overflow-hidden rounded-[10px] bg-black/20">
-								{activeIsVideo ? (
-									<video
-										key={activeMediaUrl}
-										src={activeMediaUrl}
-										autoPlay
-										muted
-										loop
-										playsInline
-										className="h-full w-full object-cover"
-									/>
-								) : (
-									<Image
-										key={activeMediaUrl}
-										src={activeMediaUrl}
-										alt={activeProject.title}
-										width={1200}
-										height={800}
-										quality={95}
-										sizes="(max-width: 768px) 100vw, 50vw"
-										className="h-full w-full object-cover"
-										priority
-									/>
-								)}
-								
-								{/* Gradient Overlay */}
-								<div 
-									className="absolute inset-0 pointer-events-none"
-									style={{
-										background: "linear-gradient(rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0) 100%)",
-										opacity: 1,
-										willChange: "auto",
-										zIndex: 2
-									}}
-								/>
-								
-								{/* Tabs - Top Right */}
-								{(activeProject.tab1 || activeProject.tab2) && (
-									<div className="absolute top-4 right-4 flex gap-2 z-10">
-										{activeProject.tab1 && (
-											<div className="text-white px-3 py-2 rounded-sm text-xs font-semibold" style={{ backgroundColor: "rgba(255, 255, 255, 0.1)", backdropFilter: "blur(10px)" }}>
-												{activeProject.tab1}
-											</div>
-										)}
-										{activeProject.tab2 && (
-											<div className="text-white px-3 py-2 rounded-sm text-xs font-semibold" style={{ backgroundColor: "rgba(255, 255, 255, 0.1)", backdropFilter: "blur(10px)" }}>
-												{activeProject.tab2}
-											</div>
-										)}
-									</div>
-								)}
-							</div>
+								<div className="relative w-full h-full overflow-hidden rounded-[10px] bg-black/20">
+									{activeIsVideo ? (
+										<video
+											key={activeMediaUrl}
+											src={activeMediaUrl}
+											autoPlay
+											muted
+											loop
+											playsInline
+											className="h-full w-full object-cover"
+										/>
+									) : (
+										<Image
+											key={activeMediaUrl}
+											src={activeMediaUrl}
+											alt={activeProject.title}
+											width={1200}
+											height={800}
+											quality={95}
+											sizes="(max-width: 768px) 100vw, 50vw"
+											className="h-full w-full object-cover"
+											priority
+										/>
+									)}
+								</div>
 							</div>
 						</div>
 					) : (
@@ -303,33 +276,6 @@ const FeaturedProjects = ({ initialProjects = [] }: FeaturedProjectsProps) => {
 										className="h-full w-full object-cover"
 										priority
 									/>
-								)}
-								
-								{/* Gradient Overlay */}
-								<div 
-									className="absolute inset-0 pointer-events-none"
-									style={{
-										background: "linear-gradient(rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0) 100%)",
-										opacity: 1,
-										willChange: "auto",
-										zIndex: 2
-									}}
-								/>
-								
-								{/* Tabs - Top Right */}
-								{(activeProject.tab1 || activeProject.tab2) && (
-									<div className="absolute top-4 right-4 flex gap-2 z-10">
-										{activeProject.tab1 && (
-											<div className="text-white px-3 py-2 rounded-sm text-xs font-semibold" style={{ backgroundColor: "rgba(255, 255, 255, 0.1)", backdropFilter: "blur(10px)" }}>
-												{activeProject.tab1}
-											</div>
-										)}
-										{activeProject.tab2 && (
-											<div className="text-white px-3 py-2 rounded-sm text-xs font-semibold" style={{ backgroundColor: "rgba(255, 255, 255, 0.1)", backdropFilter: "blur(10px)" }}>
-												{activeProject.tab2}
-											</div>
-										)}
-									</div>
 								)}
 							</div>
 						</div>

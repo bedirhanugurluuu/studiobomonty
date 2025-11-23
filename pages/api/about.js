@@ -19,19 +19,36 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
+      // Check if environment variables are set
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        console.error('Missing Supabase environment variables');
+        return res.status(500).json({ 
+          error: 'Server configuration error',
+          details: 'Missing Supabase credentials'
+        });
+      }
+
       // Cache headers ekle
       res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
       
       const { data, error } = await supabase
         .from('about_content')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
       
-      if (error) throw error;
-      res.json(data);
+      if (error && error.code !== 'PGRST116') {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+      res.json(data || null);
     } catch (error) {
-      console.error('Error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      console.error('Error fetching about content:', error);
+      res.status(500).json({ 
+        error: 'Internal server error',
+        details: error.message 
+      });
     }
   } else if (req.method === 'POST') {
     try {

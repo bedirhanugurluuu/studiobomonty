@@ -26,16 +26,32 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
+      // Check if environment variables are set
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        console.error('Missing Supabase environment variables');
+        return res.status(500).json({ 
+          error: 'Server configuration error',
+          details: 'Missing Supabase credentials'
+        });
+      }
+
       const { data, error } = await supabase
         .from('projects')
         .select('*')
+        .order('display_order', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
-      res.json(data);
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+      res.json(data || []);
     } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Sunucu hatası" });
+      console.error('Error fetching projects:', err);
+      res.status(500).json({ 
+        error: "Sunucu hatası",
+        details: err.message 
+      });
     }
   } else if (req.method === 'POST') {
     try {

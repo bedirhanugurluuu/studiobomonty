@@ -184,7 +184,7 @@ export default function Header() {
                   onClick={() => setMenuOpen(false)}
                 >
                   <span className="relative inline-block text-white transition-transform duration-300 uppercase">
-                    {item.label.toLowerCase()}
+                    {item.label.toUpperCase()}
                     <span className="absolute left-0 bottom-0 h-[1px] w-full origin-left scale-x-0 bg-white transition-transform duration-300 ease-out group-hover:scale-x-100" />
                   </span>
                 </Link>
@@ -245,7 +245,7 @@ export default function Header() {
                       onClick={() => setMenuOpen(false)}
                     >
                       <span
-                        className="relative inline-block text-3xl text-white lowercase"
+                        className="relative inline-block text-3xl text-white uppercase"
                         style={{
                           transform: menuOpen ? "translateY(0%)" : "translateY(100%)",
                           opacity: menuOpen ? 1 : 0,
@@ -253,7 +253,7 @@ export default function Header() {
                           transitionDelay: menuOpen ? `${0.05 * index}s` : "0s",
                         }}
                       >
-                        {item.label.toLowerCase()}
+                        {item.label.toUpperCase()}
                         <span
                           className="absolute left-0 bottom-0 h-[1px] w-full origin-left scale-x-0 bg-white transition-transform duration-300 ease-out group-hover:scale-x-100"
                         />
@@ -274,7 +274,7 @@ export default function Header() {
                         href={social.link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block tracking-[0.3em] hover:opacity-100 transition-opacity"
+                        className="block tracking-[0.3em] hover:opacity-100 transition-opacity uppercase"
                         style={{
                           transform: menuOpen ? "translateY(0%)" : "translateY(100%)",
                           opacity: menuOpen ? .4 : 0,
@@ -282,7 +282,7 @@ export default function Header() {
                           transitionDelay: menuOpen ? `${0.08 * (index + 1)}s` : "0s",
                         }}
                       >
-                        {social.name}
+                        {social.name.toUpperCase()}
                       </a>
                     </div>
                   ))}

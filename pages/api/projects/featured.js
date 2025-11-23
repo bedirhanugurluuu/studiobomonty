@@ -19,17 +19,33 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
+      // Check if environment variables are set
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        console.error('Missing Supabase environment variables');
+        return res.status(500).json({ 
+          error: 'Server configuration error',
+          details: 'Missing Supabase credentials'
+        });
+      }
+
       const { data, error } = await supabase
         .from('projects')
         .select('*')
-        .eq('featured', true)
+        .eq('is_featured', true)
+        .order('display_order', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      res.json(data);
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+      res.json(data || []);
     } catch (error) {
-      console.error('Error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      console.error('Error fetching featured projects:', error);
+      res.status(500).json({ 
+        error: 'Internal server error',
+        details: error.message 
+      });
     }
   } else {
     res.status(405).json({ error: 'Method not allowed' });
