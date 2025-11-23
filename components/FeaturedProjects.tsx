@@ -31,6 +31,9 @@ const FeaturedProjects = ({ initialProjects = [] }: FeaturedProjectsProps) => {
 
 	// IntersectionObserver to track which project is currently in view
 	useEffect(() => {
+		// Different settings for mobile vs desktop
+		const isMobileView = typeof window !== 'undefined' && window.innerWidth < 1024;
+		
 		const observer = new IntersectionObserver(
 			(entries) => {
 				entries.forEach((entry) => {
@@ -44,8 +47,8 @@ const FeaturedProjects = ({ initialProjects = [] }: FeaturedProjectsProps) => {
 			},
 			{
 				root: null,
-				threshold: 0.3,
-				rootMargin: "-20% 0px -60% 0px",
+				threshold: isMobileView ? 0.8 : 0.3,
+				rootMargin: isMobileView ? "-50% 0px -30% 0px" : "-20% 0px -60% 0px",
 			}
 		);
 
@@ -75,11 +78,85 @@ const FeaturedProjects = ({ initialProjects = [] }: FeaturedProjectsProps) => {
 		activeMediaUrl.toLowerCase().endsWith(".webm") ||
 		activeMediaUrl.toLowerCase().endsWith(".mov");
 
-	return (
-		<section id="featured-projects" className="p-4 mb-20 md:mb-1">
+	// Section and text container refs for height calculation (mobile only)
+	const sectionRef = useRef<HTMLElement>(null);
+	const textContainerRef = useRef<HTMLDivElement>(null);
+	const [sectionHeight, setSectionHeight] = useState(0);
+	const [isMobile, setIsMobile] = useState(false);
 
+	// Check if mobile (client-side only)
+	useEffect(() => {
+		const checkMobile = () => {
+			if (typeof window !== 'undefined') {
+				setIsMobile(window.innerWidth < 1024);
+			}
+		};
+
+		checkMobile();
+		if (typeof window !== 'undefined') {
+			window.addEventListener('resize', checkMobile);
+		}
+
+		return () => {
+			if (typeof window !== 'undefined') {
+				window.removeEventListener('resize', checkMobile);
+			}
+		};
+	}, []);
+
+	// Calculate section height for mobile sticky behavior
+	useEffect(() => {
+		if (!isMobile || typeof window === 'undefined') {
+			setSectionHeight(0);
+			return;
+		}
+
+		const updateHeight = () => {
+			if (sectionRef.current && isMobile) {
+				// Measure the entire section height
+				const height = sectionRef.current.offsetHeight;
+				setSectionHeight(height);
+			}
+		};
+
+		// Initial calculation with delay to ensure DOM is ready
+		const timeoutId = setTimeout(updateHeight, 200);
+		updateHeight();
+
+		if (typeof window !== 'undefined') {
+			window.addEventListener('resize', updateHeight);
+		}
+
+		// Use ResizeObserver for accurate height tracking
+		let resizeObserver: ResizeObserver | null = null;
+		if (sectionRef.current && typeof ResizeObserver !== 'undefined') {
+			resizeObserver = new ResizeObserver(() => {
+				if (isMobile) {
+					updateHeight();
+				}
+			});
+			resizeObserver.observe(sectionRef.current);
+		}
+
+		return () => {
+			clearTimeout(timeoutId);
+			if (typeof window !== 'undefined') {
+				window.removeEventListener('resize', updateHeight);
+			}
+			if (resizeObserver && sectionRef.current) {
+				resizeObserver.unobserve(sectionRef.current);
+			}
+		};
+	}, [projects.length, isMobile]);
+
+	return (
+		<section ref={sectionRef} id="featured-projects" className="p-4 mb-20 md:mb-1">
 			<div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-				<div className="relative py-10 md:py-90">
+				{/* Text Column - Mobile: Second, Desktop: First */}
+				<div 
+					ref={textContainerRef}
+					className="relative order-2 lg:order-1 pb-10 pt-80 md:py-90 z-0"
+				>
 					<div className="flex flex-col space-y-[150px]">
 						{projects.map((project, index) => (
 							<div
@@ -109,32 +186,154 @@ const FeaturedProjects = ({ initialProjects = [] }: FeaturedProjectsProps) => {
 					</div>
 				</div>
 
-				<div className="relative">
-					<div className="relative md:sticky top-0 flex md:h-screen w-full items-center justify-center">
-						<div className="relative w-full overflow-hidden rounded-[10px] bg-black/20">
-							{activeIsVideo ? (
-								<video
-									key={activeMediaUrl}
-									src={activeMediaUrl}
-									autoPlay
-									muted
-									loop
-									playsInline
-									className="h-full w-full object-cover"
+				{/* Image Column - Mobile: First, Desktop: Second */}
+				<div className="relative order-1 lg:order-2">
+					{/* Mobile: Absolute wrapper with section height */}
+					{/* Desktop: Simple sticky wrapper */}
+					{isMobile ? (
+						<div 
+							className="absolute top-0 z-10"
+							style={{ 
+								display: 'flex',
+								alignItems: 'flex-start',
+								justifyContent: 'center',
+								flexDirection: 'row',
+								flexWrap: 'nowrap',
+								gap: '10px',
+								width: '100%',
+								height: sectionHeight > 0 ? `${sectionHeight}px` : 'auto',
+								flex: '1 0 0px',
+								overflow: 'visible',
+								padding: 0,
+								position: 'absolute',
+								top: 0,
+								right: 0,
+							}}
+						>
+							{/* Absolute positioned image container */}
+							<div 
+								className="absolute top-0 right-0 w-full flex items-center justify-center"
+								style={{ 
+									position: 'sticky',
+									top: "85px",
+									right: 0,
+									width: '100%',
+									height: "auto",
+									pointerEvents: 'none',
+									flex: 'none',
+									alignSelf: 'unset',
+								}}
+							>
+							<div className="relative w-full h-full overflow-hidden rounded-[10px] bg-black/20">
+								{activeIsVideo ? (
+									<video
+										key={activeMediaUrl}
+										src={activeMediaUrl}
+										autoPlay
+										muted
+										loop
+										playsInline
+										className="h-full w-full object-cover"
+									/>
+								) : (
+									<Image
+										key={activeMediaUrl}
+										src={activeMediaUrl}
+										alt={activeProject.title}
+										width={1200}
+										height={800}
+										quality={95}
+										sizes="(max-width: 768px) 100vw, 50vw"
+										className="h-full w-full object-cover"
+										priority
+									/>
+								)}
+								
+								{/* Gradient Overlay */}
+								<div 
+									className="absolute inset-0 pointer-events-none"
+									style={{
+										background: "linear-gradient(rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0) 100%)",
+										opacity: 1,
+										willChange: "auto",
+										zIndex: 2
+									}}
 								/>
-							) : (
-								<Image
-									key={activeMediaUrl}
-									src={activeMediaUrl}
-									alt={activeProject.title}
-									width={1200}
-									height={800}
-									className="h-full w-full object-cover"
-									priority
-								/>
-							)}
+								
+								{/* Tabs - Top Right */}
+								{(activeProject.tab1 || activeProject.tab2) && (
+									<div className="absolute top-4 right-4 flex gap-2 z-10">
+										{activeProject.tab1 && (
+											<div className="text-white px-3 py-2 rounded-sm text-xs font-semibold" style={{ backgroundColor: "rgba(255, 255, 255, 0.1)", backdropFilter: "blur(10px)" }}>
+												{activeProject.tab1}
+											</div>
+										)}
+										{activeProject.tab2 && (
+											<div className="text-white px-3 py-2 rounded-sm text-xs font-semibold" style={{ backgroundColor: "rgba(255, 255, 255, 0.1)", backdropFilter: "blur(10px)" }}>
+												{activeProject.tab2}
+											</div>
+										)}
+									</div>
+								)}
+							</div>
+							</div>
 						</div>
-					</div>
+					) : (
+						<div className="relative md:sticky top-0 flex md:h-screen w-full items-center justify-center">
+							<div className="relative w-full overflow-hidden rounded-[10px] bg-black/20">
+								{activeIsVideo ? (
+									<video
+										key={activeMediaUrl}
+										src={activeMediaUrl}
+										autoPlay
+										muted
+										loop
+										playsInline
+										className="h-full w-full object-cover"
+									/>
+								) : (
+									<Image
+										key={activeMediaUrl}
+										src={activeMediaUrl}
+										alt={activeProject.title}
+										width={1200}
+										height={800}
+										quality={95}
+										sizes="(max-width: 768px) 100vw, 50vw"
+										className="h-full w-full object-cover"
+										priority
+									/>
+								)}
+								
+								{/* Gradient Overlay */}
+								<div 
+									className="absolute inset-0 pointer-events-none"
+									style={{
+										background: "linear-gradient(rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0) 100%)",
+										opacity: 1,
+										willChange: "auto",
+										zIndex: 2
+									}}
+								/>
+								
+								{/* Tabs - Top Right */}
+								{(activeProject.tab1 || activeProject.tab2) && (
+									<div className="absolute top-4 right-4 flex gap-2 z-10">
+										{activeProject.tab1 && (
+											<div className="text-white px-3 py-2 rounded-sm text-xs font-semibold" style={{ backgroundColor: "rgba(255, 255, 255, 0.1)", backdropFilter: "blur(10px)" }}>
+												{activeProject.tab1}
+											</div>
+										)}
+										{activeProject.tab2 && (
+											<div className="text-white px-3 py-2 rounded-sm text-xs font-semibold" style={{ backgroundColor: "rgba(255, 255, 255, 0.1)", backdropFilter: "blur(10px)" }}>
+												{activeProject.tab2}
+											</div>
+										)}
+									</div>
+								)}
+							</div>
+						</div>
+					)}
 				</div>
 			</div>
 		</section>

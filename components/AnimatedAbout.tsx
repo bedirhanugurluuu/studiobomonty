@@ -116,7 +116,7 @@ export default function AnimatedAbout({ initialContent, initialProjects = [], in
             delay={0}
           >
             <div className="overflow-hidden">
-              <h1 className="max-w-4xl text-3xl font-medium uppercase leading-tight md:text-7xl" style={{ lineHeight: ".9" }}>
+              <h1 className="max-w-4xl text-4xl font-medium uppercase leading-tight md:text-7xl" style={{ lineHeight: ".9" }}>
                 {heroWords.map((word, idx) => (
                   <span key={`${word}-${idx}`} className="inline-block" style={{ lineHeight: ".9" }}>
                     <span
@@ -144,8 +144,13 @@ export default function AnimatedAbout({ initialContent, initialProjects = [], in
       <div className="w-full">
         <div
           ref={heroImageRef}
-          className="relative w-full overflow-hidden transition-[padding] duration-500 ease-out"
-          style={{ height: "120vh", padding: heroPaddingActive ? "0px" : "15px" }}
+          className="about-hero-image relative w-full overflow-hidden transition-[padding] duration-500 ease-out"
+          style={{ 
+            height: "120vh", 
+            padding: typeof window !== 'undefined' && window.innerWidth < 1024 
+              ? "15px" 
+              : (heroPaddingActive ? "0px" : "15px")
+          }}
         >
           <img
             src={normalizeImageUrl(content.image_path || '')}
@@ -158,13 +163,13 @@ export default function AnimatedAbout({ initialContent, initialProjects = [], in
       {/* Offices Section */}
       <div className="w-full">
         <div
-          className="relative w-full overflow-hidden px-4 pt-25 pb-55"
+          className="relative w-full overflow-hidden px-4 pt-25 pb-5 md:pb-55"
         >
-          <h2 className="text-xl font-medium mb-15">
+          <h2 className="text-sm md:text-xl font-medium mb-15">
             OFFICES
           </h2>
           <div className="flex flex-col gap-2">
-            <span className="text-[160px] font-medium" style={{ lineHeight: "160px" }}>IST</span>
+            <span className="text-[100px] md:text-[160px] leading-[100px] md:leading-[160px] font-medium" >IST</span>
             <p className="opacity-50 text-sm font-medium" style={{ lineHeight: "16px" }}>125 W 26th Street, 9th Floor <br /> New York, NY 10001</p>
           </div>
         </div>
@@ -255,7 +260,7 @@ const RecognitionSection = ({ initialRecognition = null, initialRecognitionItems
   if (!recognition || items.length === 0) return null;
 
   return (
-    <section className="px-4 py-24">
+    <section className="px-4 py-10 md:py-24">
       <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
         {/* Left: Recognition Title */}
         <div className="flex items-start">
@@ -266,14 +271,14 @@ const RecognitionSection = ({ initialRecognition = null, initialRecognitionItems
         <div className="flex flex-col">
           {items.map((item, index) => (
             <div key={item.id} className="flex flex-col">
-              <div className="grid grid-cols-3 gap-8">
+              <div className="flex flex-row flex-nowrap items-start gap-[10px] w-full">
                 {/* Organization Name */}
-                <div className="flex items-start">
+                <div className="flex flex-col flex-[.8_0_0px]">
                   <h3 className="text-lg font-medium text-white">{item.organization_name}</h3>
                 </div>
 
                 {/* Awards */}
-                <div className="flex flex-col">
+                <div className="flex flex-col flex-[1_0_0px]">
                   {item.awards.map((award, awardIndex) => (
                     <div key={awardIndex} className="flex items-center">
                       <span className="text-sm uppercase text-white">{award}</span>
@@ -282,7 +287,7 @@ const RecognitionSection = ({ initialRecognition = null, initialRecognitionItems
                 </div>
 
                 {/* Counts - Sağa yaslı */}
-                <div className="flex flex-col items-end">
+                <div className="flex flex-col items-end flex-[.25_0_0px]">
                   {item.counts.map((count, countIndex) => (
                     <span key={countIndex} className="text-sm uppercase text-white">{count}</span>
                   ))}
@@ -309,7 +314,6 @@ const RecognitionSection = ({ initialRecognition = null, initialRecognitionItems
     </section>
   );
 };
-
 interface ClientsSectionProps {
   initialClientsSettings?: ClientsSettings | null;
   initialClients?: Client[];
@@ -319,6 +323,10 @@ const ClientsSection = ({ initialClientsSettings = null, initialClients = [] }: 
   const [settings, setSettings] = useState<ClientsSettings | null>(initialClientsSettings);
   const [clients, setClients] = useState<Client[]>(initialClients);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [intersectionRatios, setIntersectionRatios] = useState<Map<number, number>>(new Map());
+  const [isMobile, setIsMobile] = useState(false);
+  const sectionRef = useRef<HTMLElement | null>(null);
   const clientRowRefs = useRef<(HTMLDivElement | null)[]>([]);
   const imageContainerRef = useRef<HTMLDivElement | null>(null);
   const orderContainerRef = useRef<HTMLDivElement | null>(null);
@@ -336,7 +344,93 @@ const ClientsSection = ({ initialClientsSettings = null, initialClients = [] }: 
     }
   }, [initialClientsSettings, initialClients.length]);
 
+  // Set isMobile on client-side only
   useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // IntersectionObserver for mobile scroll-based active client
+  useEffect(() => {
+    if (clients.length === 0 || !isMobile) return;
+
+    const ratios = new Map<number, number>();
+
+    // Section'ın görünürlüğünü kontrol et
+    const sectionObserver = new IntersectionObserver(
+      (entries) => {
+        const sectionEntry = entries[0];
+        if (!sectionEntry.isIntersecting) {
+          setActiveIndex(null);
+          return;
+        }
+      },
+      {
+        root: null,
+        threshold: 0.1,
+      }
+    );
+
+    // Her client'in görünürlüğünü kontrol et
+    const clientObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const index = Number(entry.target.getAttribute("data-index"));
+          if (!Number.isNaN(index)) {
+            ratios.set(index, entry.intersectionRatio);
+          }
+        });
+
+        setIntersectionRatios(new Map(ratios));
+
+        // En yüksek intersection ratio'ya sahip client'i bul
+        let maxRatio = 0;
+        let maxIndex: number | null = null;
+
+        ratios.forEach((ratio, index) => {
+          if (ratio > maxRatio && ratio > 0.1) {
+            maxRatio = ratio;
+            maxIndex = index;
+          }
+        });
+
+        setActiveIndex(maxIndex);
+      },
+      {
+        root: null,
+        threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+        rootMargin: "-20% 0px -30% 0px",
+      }
+    );
+
+    // Section'ı gözle
+    if (sectionRef.current) {
+      sectionObserver.observe(sectionRef.current);
+    }
+
+    // Client'leri gözle
+    clientRowRefs.current.forEach((el) => {
+      if (el) clientObserver.observe(el);
+    });
+
+    return () => {
+      if (sectionRef.current) {
+        sectionObserver.unobserve(sectionRef.current);
+      }
+      clientRowRefs.current.forEach((el) => {
+        if (el) clientObserver.unobserve(el);
+      });
+    };
+  }, [clients.length, isMobile]);
+
+  // Desktop hover effect
+  useEffect(() => {
+    if (isMobile) return; // Only for desktop
+
     if (hoveredIndex !== null && clientRowRefs.current[hoveredIndex]) {
       const hoveredRow = clientRowRefs.current[hoveredIndex];
       const imageContainer = imageContainerRef.current;
@@ -419,64 +513,133 @@ const ClientsSection = ({ initialClientsSettings = null, initialClients = [] }: 
         }
       }
     }
-  }, [hoveredIndex]);
+  }, [hoveredIndex, isMobile]);
 
   if (!settings || clients.length === 0) return null;
 
-  const activeClient = hoveredIndex !== null ? clients[hoveredIndex] : null;
+  const activeClient = isMobile 
+    ? (activeIndex !== null ? clients[activeIndex] : null)
+    : (hoveredIndex !== null ? clients[hoveredIndex] : null);
+
+  const activeMediaUrl = activeClient?.image_path ? normalizeImageUrl(activeClient.image_path) : null;
+  const activeIsVideo =
+    activeMediaUrl &&
+    (activeMediaUrl.toLowerCase().endsWith(".mp4") ||
+      activeMediaUrl.toLowerCase().endsWith(".webm") ||
+      activeMediaUrl.toLowerCase().endsWith(".mov"));
 
   return (
-    <section className="px-4 py-24">
+    <section ref={sectionRef} className="px-4 py-24">
       <div className="mb-10">
         <h2 className="text-xl uppercase font-medium">{settings.title}</h2>
       </div>
       
-      <div className="relative py-5 px-4">
-        {/* Sol: Tek görsel alanı - absolute */}
-        <div
-          ref={imageContainerRef}
-          className="absolute left-0 flex items-center"
-          style={{ transform: 'translateY(-20px)' }}
-        >
-          {activeClient?.image_path && (
-            <img
-              src={normalizeImageUrl(activeClient.image_path)}
-              alt={activeClient.name}
-              className="w-38 h-25 object-cover opacity-0"
-              style={{ borderRadius: '4px' }}
-            />
+      <div className="relative grid gap-12 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        {/* Left: Client Names */}
+        <div className="relative py-5 md:px-4">
+          {/* Desktop: Sol ve sağ absolute görsel/order alanları */}
+          {!isMobile && (
+            <>
+              {/* Sol: Tek görsel alanı - absolute */}
+              <div
+                ref={imageContainerRef}
+                className="absolute left-0 flex items-center"
+                style={{ transform: 'translateY(-20px)' }}
+              >
+                {activeClient?.image_path && (
+                  <img
+                    src={normalizeImageUrl(activeClient.image_path)}
+                    alt={activeClient.name}
+                    className="w-38 h-25 object-cover opacity-0"
+                    style={{ borderRadius: '4px' }}
+                  />
+                )}
+              </div>
+
+              {/* Sağ: Tek order alanı - absolute */}
+              <div
+                ref={orderContainerRef}
+                className="absolute right-0 flex items-center"
+                style={{ transform: 'translateY(20px)' }}
+              >
+                <span className="text-sm uppercase text-white opacity-0">
+                  {activeClient?.order_index || ''}
+                </span>
+              </div>
+            </>
           )}
+
+          {/* Client isimleri */}
+          <div className="flex flex-col">
+            {clients.map((client, index) => (
+              <div
+                key={client.id}
+                ref={(el) => {
+                  clientRowRefs.current[index] = el;
+                }}
+                data-index={index}
+                className={`group relative w-full flex items-center justify-start md:justify-center text-center transition-opacity duration-300 ${
+                  isMobile 
+                    ? (activeIndex === index ? "opacity-100" : "opacity-10")
+                    : "hover:cursor-pointer"
+                }`}
+                onMouseEnter={() => !isMobile && setHoveredIndex(index)}
+                onMouseLeave={() => !isMobile && setHoveredIndex(null)}
+              >
+                <span className={`text-4xl md:text-6xl font-medium uppercase transition-opacity duration-300 ${
+                  isMobile ? "" : "opacity-10 group-hover:opacity-100"
+                }`}>
+                  {client.name}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Sağ: Tek order alanı - absolute */}
-        <div
-          ref={orderContainerRef}
-          className="absolute right-0 flex items-center"
-          style={{ transform: 'translateY(20px)' }}
-        >
-          <span className="text-sm uppercase text-white opacity-0">
-            {activeClient?.order_index || ''}
-          </span>
-        </div>
-
-        {/* Orta: Client isimleri - tam genişlikte */}
-        <div className="flex flex-col">
-          {clients.map((client, index) => (
-            <div
-              key={client.id}
-              ref={(el) => {
-                clientRowRefs.current[index] = el;
-              }}
-              className="group relative w-full flex items-center justify-center text-center hover:cursor-pointer"
-              onMouseEnter={() => setHoveredIndex(index)}
-              onMouseLeave={() => setHoveredIndex(null)}
-            >
-              <span className="text-6xl font-medium uppercase opacity-10 group-hover:opacity-100 transition-opacity duration-300">
-                {client.name}
-              </span>
+        {/* Right: Mobile Sticky Media Preview */}
+        {isMobile && (
+          <div className="banner-sticky-client">
+            <div className="sticky top-[100px] flex w-full items-center justify-center">
+              <div className="relative w-full overflow-hidden rounded-[10px] bg-black/20">
+                {activeIndex !== null && activeMediaUrl ? (
+                  activeIsVideo ? (
+                    <video
+                      key={activeMediaUrl}
+                      src={activeMediaUrl}
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <Image
+                      key={activeMediaUrl}
+                      src={activeMediaUrl}
+                      alt={activeClient?.name || "Client"}
+                      width={1200}
+                      height={800}
+                      className="h-full w-full object-cover"
+                      priority
+                    />
+                  )
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-white/10 text-white/60">
+                    {activeIndex === null ? "" : "No image"}
+                  </div>
+                )}
+                {/* Order gösterimi */}
+                {activeClient?.order_index && (
+                  <div className="absolute bottom-4 right-4">
+                    <span className="text-sm uppercase text-white">
+                      {activeClient.order_index}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -504,7 +667,7 @@ const LatestProjectsBannerSection = ({ initialBanner = null }: LatestProjectsBan
   if (!banner) return null;
 
   return (
-    <section className="px-4 py-24">
+    <section className="px-4 py-10 md:py-24">
       <div className="relative w-full">
         {banner.image_path && (
           <div className="w-full">
@@ -517,12 +680,12 @@ const LatestProjectsBannerSection = ({ initialBanner = null }: LatestProjectsBan
             />
           </div>
         )}
-        <div className="absolute bottom-0 left-0 p-6 md:p-8 flex flex-col gap-2">
-          <h2 className="text-2xl lg:text-3xl uppercase font-medium text-white">{banner.title}</h2>
-          <p className="text-md text-white/50 max-w-xs" style={{ lineHeight: "1" }}>{banner.subtitle}</p>
+        <div className="absolute bottom-0 left-0 p-4 md:p-8 flex flex-col gap-2">
+          <h2 className="text-xl lg:text-3xl uppercase font-medium text-white">{banner.title}</h2>
+          <p className="text-sm md:text-md text-white/50 max-w-xs" style={{ lineHeight: "1" }}>{banner.subtitle}</p>
           <Link
             href="/projects"
-            className="group relative inline-flex items-center mt-3 text-sm uppercase tracking-wider text-white"
+            className="group relative inline-flex items-center mt-3 text-xs md:text-sm uppercase tracking-wider text-white"
           >
             <span className="relative inline-block">
               view work
@@ -585,6 +748,7 @@ const ServicesSection = ({ initialServices = [] }: ServicesSectionProps) => {
     );
 
     // Her servisin görünürlüğünü kontrol et
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
     const serviceObserver = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -612,7 +776,7 @@ const ServicesSection = ({ initialServices = [] }: ServicesSectionProps) => {
       {
         root: null,
         threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
-        rootMargin: "-30% 0px -30% 0px",
+        rootMargin: isMobile ? "-20% 0px -30% 0px" : "-30% 0px -30% 0px",
       }
     );
 
@@ -650,7 +814,7 @@ const ServicesSection = ({ initialServices = [] }: ServicesSectionProps) => {
 
   return (
     <section ref={sectionRef} className="px-4 py-24">
-      <div className="grid gap-12 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,2.9fr)_minmax(0,0.9fr)]">
+      <div className="relative grid gap-12 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,2.9fr)_minmax(0,0.9fr)]">
         {/* Left: Services Title */}
         <div className="flex items-start">
           <h2 className="text-xl uppercase font-medium">Services</h2>
@@ -666,10 +830,10 @@ const ServicesSection = ({ initialServices = [] }: ServicesSectionProps) => {
                   itemRefs.current[index] = el;
                 }}
                 data-index={index}
-                className="group flex flex-col text-white transition-opacity duration-300 py-2"
+                className="group flex flex-col text-white transition-opacity duration-300 py-1 md:py-2"
               >
                 <span
-                  className={`text-4xl font-medium uppercase leading-[0.9] transition-[opacity,transform] duration-500 ease-out md:text-6xl ${
+                  className={`text-3xl font-medium uppercase leading-[0.9] transition-[opacity,transform] duration-500 ease-out md:text-6xl ${
                     activeIndex === index ? "opacity-100" : "opacity-10"
                   }`}
                 >
@@ -681,7 +845,7 @@ const ServicesSection = ({ initialServices = [] }: ServicesSectionProps) => {
         </div>
 
         {/* Right: Sticky Media Preview */}
-        <div className="relative">
+        <div className="banner-sticky-media md:relative">
           <div className="sticky top-[100px] flex w-full items-center justify-center">
             <div className="relative w-full overflow-hidden rounded-[10px] bg-black/20">
               {activeIndex !== null && activeMediaUrl ? (

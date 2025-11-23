@@ -1,8 +1,6 @@
 "use client";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ContactContent, normalizeImageUrl } from "@/lib/api";
-import AnimatedText from "./AnimatedText";
-import gsap from "gsap";
 import Image from "next/image";
 
 interface ContactPageProps {
@@ -10,111 +8,202 @@ interface ContactPageProps {
 }
 
 export default function ContactPage({ content }: ContactPageProps) {
-  const contactRef = useRef<HTMLDivElement>(null);
-  const socialsRef = useRef<HTMLDivElement>(null);
+  const [animateTitle, setAnimateTitle] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    message: "",
+  });
+
+  // Title'ı kelimelere böl
+  const titleWords = useMemo(() => {
+    if (!content.title) return [];
+    return content.title
+      .split(/\s+/)
+      .map((word) => word.trim())
+      .filter(Boolean);
+  }, [content.title]);
+
+  const joinedTitle = useMemo(() => titleWords.join(" "), [titleWords]);
 
   useEffect(() => {
-    const tl = gsap.timeline();
-    
-    tl.fromTo([contactRef.current, socialsRef.current], 
-      { y: 30, opacity: 0 },
-      { y: 0, opacity: 1, duration: 0.8, stagger: 0.2, ease: "power2.out" }
-    );
-  }, []);
+    setAnimateTitle(false);
+    const timeout = window.setTimeout(() => setAnimateTitle(true), 60);
+    return () => window.clearTimeout(timeout);
+  }, [joinedTitle]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Form submit işlemi burada yapılacak
+    console.log("Form submitted:", formData);
+    // TODO: API'ye form gönder
+  };
 
   return (
-    <div className="bg-white">
-      <div className="pt-37">
-        <div>
-          {/* Title */}
-          <div className="mb-45 px-5 max-w-[420px]">
-            <AnimatedText className="text-3xl md:text-4xl font-medium text-gray-900 max-w-4xl">
-              {content.title || "Contact"}
-            </AnimatedText>
+    <div className=" min-h-screen">
+      {/* Banner Section */}
+      {content.image_path && (
+        <section className="relative w-full overflow-hidden" style={{ height: "75vh" }}>
+          <Image
+            src={normalizeImageUrl(content.image_path)}
+            alt="Contact"
+            fill
+            quality={95}
+            sizes="100vw"
+            className="object-cover"
+            priority
+          />
+          <div className="pointer-events-none absolute inset-0" style={{ background: "linear-gradient(rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0) 100%)" }} />
+          
+          {/* Title Overlay */}
+          <div className="absolute inset-0 flex items-end justify-center p-6">
+            {!!titleWords.length && (
+              <h1 className="max-w-3xl text-3xl font-medium uppercase leading-tight text-white md:text-7xl text-center" style={{ lineHeight: ".9" }}>
+                {titleWords.map((word, idx) => (
+                  <span key={`title-${word}-${idx}`} className="inline-block" style={{ lineHeight: ".9" }}>
+                    <span
+                      className="inline-block transition-all duration-500 will-change-transform"
+                      style={{
+                        transitionDelay: `${idx * 120}ms`,
+                        transitionProperty: "opacity, transform, filter",
+                        opacity: animateTitle ? 1 : 0,
+                        transform: animateTitle ? "translateY(0)" : "translateY(0.6em)",
+                        filter: animateTitle ? "blur(0px)" : "blur(6px)",
+                      }}
+                    >
+                      {word}
+                    </span>
+                    {idx !== titleWords.length - 1 && <span>&nbsp;</span>}
+                  </span>
+                ))}
+              </h1>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Content Section - Two Columns */}
+      <div className="px-4 py-16">
+        <div className="grid lg:grid-cols-2 gap-12">
+          {/* Left Column - Form */}
+          <div className="max-w-md">
+            <h2 className="text-sm font-medium mb-5 opacity-40 uppercase">Message</h2>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <input
+                  type="text"
+                  id="name"
+                  value={formData.name}
+                  placeholder="Name"
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full p-3 text-sm border border-[#161616] rounded-md focus:outline-none focus:border-[#ffffff1a]"
+                  style={{ backgroundColor: "#161616" }}
+                  required
+                />
+              </div>
+
+              <div>
+                <input
+                  type="email"
+                  id="email"
+                  value={formData.email}
+                  placeholder="Email Address"
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full p-3 text-sm border border-[#161616] rounded-md focus:outline-none focus:border-[#ffffff1a]"
+                  style={{ backgroundColor: "#161616" }}
+                  required
+                />
+              </div>
+
+              <div>
+                <textarea
+                  id="message"
+                  value={formData.message}
+                  placeholder="Message"
+                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                  rows={6}
+                  className="w-full p-3 text-sm border border-[#161616] rounded-md focus:outline-none focus:border-[#ffffff1a] resize-none"
+                  style={{ backgroundColor: "#161616" }}
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="bg-[#ffffff0d] w-[120px] font-medium text-white text-sm py-2 rounded-xl hover:bg-[#ffffff1a] transition-colors font-medium"
+              >
+                Submit
+              </button>
+            </form>
           </div>
 
-          {/* Contact Info Grid */}
-          <div className="flex flex-wrap gap-4 mb-10 px-5">
-            {/* Contact */}
-            <div ref={contactRef} className="space-y-4 min-w-[240px]">
-              <h3 className="text-xs font-medium uppercase tracking-wider mb-1">
-                CONTACT
-              </h3>
-              <div className="space-y-2">
+          {/* Right Column - Contact Info */}
+          <div className="space-y-10">
+            {/* Office */}
+            {content.address && (
+              <div>
+                <h3 className="text-sm font-medium uppercase tracking-wider mb-2 opacity-40">Office</h3>
+                {content.address_link ? (
+                  <a
+                    href={content.address_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xl md:text-3xl font-medium max-w-md hover:opacity-70 transition-opacity block"
+                  >
+                    {content.address}
+                  </a>
+                ) : (
+                  <p className="text-xl md:text-3xl font-medium max-w-md">{content.address}</p>
+                )}
+              </div>
+            )}
+
+            {/* Request */}
+            {content.email && (
+              <div>
+                <h3 className="text-sm font-medium uppercase tracking-wider mb-2 opacity-40">Request</h3>
                 <a
-                  href={`tel:${content.phone.replace(/\s+/g, '')}`}
-                  className="text-sm opacity-40 hover:opacity-100 font-medium mb-0 block transition-opacity"
-                >
-                  {content.phone}
-                </a>
-                <a
-                  href={`mailto:${content.email.replace(/\s+/g, '')}`}
-                  className="text-sm opacity-40 hover:opacity-100 font-medium mb-0 block transition-opacity"
+                  href={`mailto:${content.email}`}
+                  className="text-xl md:text-3xl font-medium hover:opacity-70 transition-opacity"
                 >
                   {content.email}
                 </a>
               </div>
-            </div>
+            )}
+
+            {/* Phone */}
+            {content.phone && (
+              <div>
+                <h3 className="text-sm font-medium uppercase tracking-wider mb-2 opacity-40">Phone</h3>
+                <a
+                  href={`tel:${content.phone.replace(/\s+/g, '')}`}
+                  className="text-xl md:text-3xl font-medium hover:opacity-70 transition-opacity"
+                >
+                  {content.phone}
+                </a>
+              </div>
+            )}
 
             {/* Socials */}
-            <div ref={socialsRef} className="space-y-4 min-w-[200px]">
-              <h3 className="text-xs font-medium uppercase tracking-wider mb-1">
-                SOCIALS
-              </h3>
-              <div className="space-y-2">
-                {content.social_items?.map((item, index) => (
-                  <a
-                    key={index}
-                    href={item.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm font-medium opacity-40 hover:opacity-100 transition-opacity block mb-0"
-                  >
-                    {item.name}
-                  </a>
-                )) || (
-                  <>
+            {content.social_items && content.social_items.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium uppercase tracking-wider mb-2 opacity-40">Socials</h3>
+                <div className="space-y-2">
+                  {content.social_items.map((item, index) => (
                     <a
-                      href="#"
+                      key={index}
+                      href={item.link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm font-medium opacity-40 hover:opacity-100 transition-opacity block mb-0"
+                      className="block text-xl md:text-3xl font-medium hover:opacity-70 transition-opacity"
                     >
-                      Instagram
+                      {item.name}
                     </a>
-                    <a
-                      href="#"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm font-medium opacity-40 hover:opacity-100 transition-opacity block mb-0"
-                    >
-                      LinkedIn
-                    </a>
-                  </>
-                )}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
-
-          {/* Full Width Image */}
-           <div className="relative w-full" style={{ aspectRatio: '3.076923076923077 / 1' }}>
-             {content.image_path ? (
-               <Image
-                 src={normalizeImageUrl(content.image_path)}
-                 alt="Contact"
-                 fill
-                 className="object-cover"
-                 sizes="100vw"
-                 loading="lazy"
-                 placeholder="blur"
-                 blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
-               />
-             ) : (
-               <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                 <span className="text-gray-500 text-lg">Contact Image Placeholder</span>
-               </div>
-             )}
-           </div>
         </div>
       </div>
     </div>

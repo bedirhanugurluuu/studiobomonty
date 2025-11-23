@@ -37,6 +37,7 @@ export default function AboutBanner() {
                 src={normalizeImageUrl(banner.image)}
                 alt="About Banner"
                 fill
+                quality={90}
                 sizes="100vw"
                 loading="lazy"
                 className="relative"

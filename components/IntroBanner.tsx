@@ -95,6 +95,8 @@ export default function IntroBanner({ initialBanner = null }: IntroBannerProps) 
             alt={banner.title_line1 || "Intro banner"}
             fill
             priority
+            quality={95}
+            sizes="100vw"
             style={{ minHeight: "calc(100vh - 30px)" }}
             className="object-cover"
           />

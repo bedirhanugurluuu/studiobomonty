@@ -36,7 +36,7 @@ export default function Footer() {
         <footer className="bg-black text-white relative bottom-0 px-4 pt-25 pb-8" style={{ zIndex: '1' }}>
             <div className="mx-auto">
                 {/* Line */}
-                <div className="border-t border-white/10 opacity-80" />
+                <div className="border-t border-white opacity-25" />
 
                 {/* Grid */}
                 <div className="grid grid-cols-1 gap-10 pt-10 pb-30 text-sm md:grid-cols-3">
@@ -68,7 +68,7 @@ export default function Footer() {
                                 <li key={i} className="mb-0">
                                     <a
                                         href={item.link}
-                                        className="group relative inline-block text-white text-md font-medium"
+                                        className="group uppercase relative inline-block text-white text-md font-medium"
                                     >
                                         <span className="relative inline-block">
                                             {item.name}
@@ -87,7 +87,7 @@ export default function Footer() {
                                 <li key={i} className="mb-0">
                                     <a
                                         href={item.link}
-                                        className="group relative inline-block text-white text-md font-medium"
+                                        className="group relative uppercase inline-block text-white text-md font-medium"
                                     >
                                         <span className="relative inline-block">
                                             {item.name}

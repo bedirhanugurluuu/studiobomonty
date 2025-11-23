@@ -56,6 +56,7 @@ export default function AboutGallery({ images }: AboutGalleryProps) {
                     src={normalizeImageUrl(image.image_path)}
                     alt={`Gallery image ${index + 1}`}
                     fill
+                    quality={90}
                     className="object-cover"
                     sizes="450px"
                   />

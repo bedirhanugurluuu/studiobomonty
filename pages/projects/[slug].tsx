@@ -22,6 +22,7 @@ export default function ProjectDetail({ project, moreProjects, galleryImages, te
   // Animation state
   const [animateContent, setAnimateContent] = useState(false);
   const [animateBottomContent, setAnimateBottomContent] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Split title and subtitle into words for animation
   const titleWords = useMemo(() => {
@@ -42,6 +43,16 @@ export default function ProjectDetail({ project, moreProjects, galleryImages, te
 
   const joinedTitle = useMemo(() => titleWords.join(" "), [titleWords]);
   const joinedSubtitle = useMemo(() => subtitleWords.join(" "), [subtitleWords]);
+
+  // Set isMobile on client-side only
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Trigger animations on mount
   useEffect(() => {
@@ -89,15 +100,21 @@ export default function ProjectDetail({ project, moreProjects, galleryImages, te
       <div className="w-full">
       {/* Banner or Video Section */}
       <section 
-        className="relative w-full overflow-hidden transition-[padding] duration-500 ease-out"
-        style={{ padding: animateContent ? "15px" : "0px" }}
+        className={`relative w-full overflow-hidden ${!isMobile ? 'transition-[padding] duration-500 ease-out' : ''}`}
+        style={{ 
+          padding: isMobile 
+            ? "0px" 
+            : (animateContent ? "15px" : "0px")
+        }}
       >
-        <div className="relative w-full overflow-hidden rounded-[10px]" style={{ height: "calc(100vh - 30px)" }}>
+        <div className="relative w-full overflow-hidden md:rounded-[10px]" style={{ height: "calc(100vh - 30px)" }}>
           {project.banner_media && (
             <Image
               src={normalizeImageUrl(project.banner_media)}
               alt="Banner"
               fill
+              quality={95}
+              sizes="100vw"
               style={{ objectFit: "cover", minHeight: "calc(100vh - 30px)" }}
               priority
               className="object-cover"
@@ -122,7 +139,7 @@ export default function ProjectDetail({ project, moreProjects, galleryImages, te
           />
 
           {/* Content Container - Bottom aligned */}
-          <div className="absolute inset-0 flex flex-col items-end justify-end py-6 md:px-4 z-10">
+          <div className="absolute inset-0 flex flex-col items-end justify-end py-6 px-4 z-10">
             <div className="w-full max-w-full">
               {/* Title and Subtitle - Same h1 */}
               <h1 className="text-white text-3xl lg:text-5xl font-medium leading-tight mb-9" style={{ lineHeight: ".9" }}>
@@ -219,7 +236,7 @@ export default function ProjectDetail({ project, moreProjects, galleryImages, te
                    )}
 
                   {/* Right: Tabs */}
-                  <div className="font-semibold flex gap-1 flex-1 justify-end">
+                  <div className="font-semibold flex gap-1 flex-1 justify-start md:justify-end">
                     {project.tab1 && (
                       <div className="text-white px-3 py-2 rounded-sm" style={{ backgroundColor: "rgba(255, 255, 255, 0.1)" }}>
                         <span>
@@ -243,7 +260,7 @@ export default function ProjectDetail({ project, moreProjects, galleryImages, te
       </section>
 
       {/* Gallery and Description Section */}
-      <section className="px-4">
+      <section className="px-4 py-4 md:py-0">
         <div className="flex flex-col gap-4">
           {/* First 2 images side by side */}
           {galleryImages.length >= 2 && (
@@ -266,6 +283,7 @@ export default function ProjectDetail({ project, moreProjects, galleryImages, te
                         src={normalizeImageUrl(image)}
                         alt={`Gallery image ${idx + 1}`}
                         fill
+                        quality={90}
                         className="object-cover rounded-[10px]"
                         sizes="(max-width: 768px) 100vw, 50vw"
                       />
@@ -279,7 +297,7 @@ export default function ProjectDetail({ project, moreProjects, galleryImages, te
           {/* Description */}
           {project.description && (
             <div className="flex gap-10 pb-15 pt-4">
-              <div className="flex-1"></div>
+              <div className="hidden md:block flex-1"></div>
               <div className="flex-1">
                 <h2 className="opacity-40 text-sm mb-2 uppercase font-medium">About the project</h2>
                 <div className="text-xl lg:text-3xl font-medium" style={{ lineHeight: "1.2" }}>
@@ -329,6 +347,7 @@ export default function ProjectDetail({ project, moreProjects, galleryImages, te
                         src={normalizeImageUrl(image)}
                         alt={`Gallery image ${i + 3}`}
                         fill
+                        quality={90}
                         className="object-cover rounded-[10px]"
                         sizes="100vw"
                       />
@@ -362,6 +381,7 @@ export default function ProjectDetail({ project, moreProjects, galleryImages, te
                           src={normalizeImageUrl(firstImage)}
                           alt={`Gallery image ${i + 3}`}
                           fill
+                          quality={90}
                           className="object-cover rounded-[10px]"
                           sizes="(max-width: 768px) 100vw, 50vw"
                         />
@@ -382,7 +402,8 @@ export default function ProjectDetail({ project, moreProjects, galleryImages, te
                           src={normalizeImageUrl(secondImage)}
                           alt={`Gallery image ${i + 4}`}
                           fill
-                          className="object-cover"
+                          quality={90}
+                          className="object-cover rounded-[10px]"
                           sizes="(max-width: 768px) 100vw, 50vw"
                         />
                       )}
@@ -400,87 +421,17 @@ export default function ProjectDetail({ project, moreProjects, galleryImages, te
 
       {/* Team Members Section */}
       {teamMembers && teamMembers.length > 0 && (
-        <section className="px-5 pt-8 pb-50 flex">
-          <div className="flex-1"></div>
+        <section className="px-5 py-8 flex">
+          <div className="hidden md:block flex-1"></div>
           <div className="flex-1">
             <div className="flex flex-col gap-1">
               {teamMembers.map((member) => (
                 <div key={member.id} className="text-sm">
-                  <span className="font-semibold opacity-40 inline-block w-1/4">{member.role_title}:</span>{" "}
+                  <span className="font-semibold opacity-40 inline-block md:w-1/4">{member.role_title}:</span>{" "}
                   <span className="inline-block font-medium">{member.person_name}</span>
                 </div>
               ))}
             </div>
-          </div>
-        </section>
-      )}
-
-      {/* More Projects Section */}
-      {moreProjects.length > 0 && (
-        <section className="px-5 pb-20 md:pb-30">
-          <div className="flex items-end justify-between mb-8">
-            <h2 className="text-2xl md:text-3xl font-medium">More Projects</h2>
-            <Link
-              href="/projects"
-              className="group relative inline-block overflow-hidden text-sm font-medium"
-            >
-              <span className="hidden md:block transition-transform duration-300 group-hover:-translate-y-full">
-                VIEW ALL PROJECTS
-              </span>
-              <span className="block md:hidden transition-transform duration-300 group-hover:-translate-y-full">
-                VIEW ALL
-              </span>
-              <span className="absolute left-0 top-full hidden md:block transition-transform duration-300 group-hover:-translate-y-full">
-                VIEW ALL PROJECTS
-              </span>
-              <span className="absolute left-0 top-full block md:hidden transition-transform duration-300 group-hover:-translate-y-full">
-                VIEW ALL
-              </span>
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            {moreProjects.map((proj) => {
-              const mediaUrl = proj.banner_media ? normalizeImageUrl(proj.banner_media) : '';
-              const isVideo = mediaUrl.toLowerCase().endsWith('.mp4') || mediaUrl.toLowerCase().endsWith('.webm');
-
-              return (
-                <Link
-                  key={proj.id}
-                  href={`/projects/${proj.slug}`}
-                  className="relative block overflow-hidden group"
-                  style={{ aspectRatio: 0.8 / 1 }}
-                >
-                  {isVideo ? (
-                    <video
-                      src={mediaUrl}
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      controls={false}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                  ) : (
-                    <Image
-                      src={mediaUrl}
-                      alt={proj.title}
-                      fill
-                      sizes="(max-width: 640px) 100vw, 33vw"
-                      loading="lazy"
-                      className="object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                  )}
-
-                  <div className="absolute bottom-4 left-4 text-white font-regular">
-                    <h3 className="text-sm font-bold">{proj.title}</h3>
-                    <p className="text-sm opacity-40 group-hover:opacity-100 transition-opacity">
-                      {proj.subtitle}
-                    </p>
-                  </div>
-                </Link>
-              );
-            })}
           </div>
         </section>
       )}

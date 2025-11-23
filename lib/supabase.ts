@@ -17,12 +17,19 @@ export interface MenuItem {
   order: number
 }
 
+export interface SocialItem {
+  id: string
+  name: string
+  link: string
+  order: number
+}
+
 export interface HeaderSettings {
   id: string
   logo_text?: string
   logo_image_url?: string
-  logo_image_url_light?: string
   menu_items: MenuItem[]
+  social_items?: SocialItem[]
   created_at: string
   updated_at: string
 }

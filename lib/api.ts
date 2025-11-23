@@ -10,6 +10,7 @@ export interface Project {
   video_url?: string;
   is_featured: boolean;
   featured_order?: number;
+  display_order?: number; // Proje sıralaması için
   client_name?: string;
   tab1?: string;
   tab2?: string;
@@ -37,6 +38,14 @@ export interface IntroBanner {
   updated_at?: string;
 }
 
+export interface JournalBanner {
+  id: string;
+  title_line1?: string;
+  image?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface AboutContent {
   id: string;
   title: string;
@@ -52,11 +61,9 @@ export interface AboutContent {
 export interface News {
   id: string;
   title: string;
-  subtitle: string;
   content: string;
   image_path?: string;
   category_text?: string;
-  photographer?: string;
   published_at?: string;
   slug: string;
   created_at: string;
@@ -134,6 +141,8 @@ export interface ContactContent {
   title: string;
   phone: string;
   email: string;
+  address?: string;
+  address_link?: string;
   social_items: Array<{ name: string; link: string }>;
   image_path?: string;
   created_at: string;
@@ -233,6 +242,7 @@ export async function fetchProjects(): Promise<Project[]> {
   const { data, error } = await supabase
     .from('projects')
     .select('*')
+    .order('display_order', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -304,6 +314,22 @@ export async function fetchIntroBanner(): Promise<IntroBanner | null> {
 
 export async function fetchIntroBannerSSR(): Promise<IntroBanner | null> {
   return fetchIntroBanner();
+}
+
+export async function fetchJournalBanner(): Promise<JournalBanner | null> {
+  const { data, error } = await supabase
+    .from('journal_banners')
+    .select('*')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error && error.code !== 'PGRST116') throw error;
+  return data ?? null;
+}
+
+export async function fetchJournalBannerSSR(): Promise<JournalBanner | null> {
+  return fetchJournalBanner();
 }
 
 export async function fetchAbout(): Promise<AboutContent | null> {

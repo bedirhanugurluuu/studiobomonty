@@ -53,15 +53,15 @@ export default function Header() {
 
   // Varsayılan menü öğeleri (fallback)
   const defaultNavItems = [
-    { href: "/projects", label: "WORK" },
+    { href: "/projects", label: "PROJECTS" },
     { href: "/about", label: "ABOUT" },
-    { href: "/blog", label: "NEWS" },
-    { href: "/careers", label: "CAREERS" },
+    { href: "/blog", label: "JOURNAL" },
+    { href: "/contact", label: "CONTACT" },
   ];
 
   // Her zaman menü öğelerini göster - loading olsa bile varsayılan öğeleri kullan
   const navItems = useMemo(() => {
-    if (headerSettings?.menu_items) {
+    if (headerSettings?.menu_items && headerSettings.menu_items.length > 0) {
       return [...headerSettings.menu_items].sort((a: any, b: any) => a.order - b.order);
     }
     return defaultNavItems;
@@ -148,49 +148,49 @@ export default function Header() {
             className="flex items-center"
             onClick={() => setMenuOpen(false)}
           >
-            {(activeBackground
-              ? headerSettings?.logo_image_url
-              : headerSettings?.logo_image_url_light) ? (
+            {headerSettings?.logo_image_url ? (
               <div className="relative h-6 w-20">
                 <Image
-                  src={
-                    activeBackground
-                      ? headerSettings?.logo_image_url ?? ""
-                      : headerSettings?.logo_image_url_light ?? ""
-                  }
+                  src={headerSettings.logo_image_url}
                   alt="Logo"
                   fill
                   className="object-contain"
                   priority
                 />
               </div>
+            ) : headerSettings?.logo_text ? (
+              <span className="text-sm font-semibold uppercase tracking-[0.3em]">
+                {headerSettings.logo_text}
+              </span>
             ) : (
               <span className="text-sm font-semibold uppercase tracking-[0.3em]">
-                {headerSettings?.logo_text ?? "StudioBomonty"}
+                StudioBomonty
               </span>
             )}
           </Link>
 
-          <nav
-            className={clsx(
-              "hidden md:flex items-center gap-6 text-xs font-medium uppercase transition-opacity duration-300",
-              menuOpen && "opacity-0 pointer-events-none"
-            )}
-          >
-            {primaryNavItems.map((item: any) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="group relative block"
-                onClick={() => setMenuOpen(false)}
-              >
-                <span className="relative inline-block text-white transition-transform duration-300 ">
-                  {item.label}
-                  <span className="absolute left-0 bottom-0 h-[1px] w-full origin-left scale-x-0 bg-white transition-transform duration-300 ease-out group-hover:scale-x-100" />
-                </span>
-              </Link>
-            ))}
-          </nav>
+          {primaryNavItems.length > 0 && (
+            <nav
+              className={clsx(
+                "hidden md:flex items-center gap-6 text-xs font-medium uppercase transition-opacity duration-300",
+                menuOpen && "opacity-0 pointer-events-none"
+              )}
+            >
+              {primaryNavItems.map((item: any) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="group relative block"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  <span className="relative inline-block text-white transition-transform duration-300 uppercase">
+                    {item.label.toLowerCase()}
+                    <span className="absolute left-0 bottom-0 h-[1px] w-full origin-left scale-x-0 bg-white transition-transform duration-300 ease-out group-hover:scale-x-100" />
+                  </span>
+                </Link>
+              ))}
+            </nav>
+          )}
 
           <div className="relative flex items-center cursor-pointer">
             <button
@@ -233,52 +233,61 @@ export default function Header() {
         >
           <div
             ref={dropdownContentRef}
-            className="grid gap-12 pt-4 pb-4 text-xs uppercase md:grid-cols-2"
+            className="grid gap-6 md:gap-12 pt-4 pb-4 text-xs uppercase md:grid-cols-2"
           >
-            <nav className="flex flex-col gap-1 text-sm font-medium uppercase md:col-span-2">
-              {navItems.map((item: any, index: number) => (
-                <div key={item.href} className="overflow-hidden">
-                  <Link
-                    href={item.href}
-                    className="group inline-block"
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    <span
-                      className="relative inline-block text-3xl text-white"
-                      style={{
-                        transform: menuOpen ? "translateY(0%)" : "translateY(100%)",
-                        opacity: menuOpen ? 1 : 0,
-                        transition: "transform 0.8s ease-out, opacity 0.8s ease-out",
-                        transitionDelay: menuOpen ? `${0.05 * index}s` : "0s",
-                      }}
+            {navItems.length > 0 && (
+              <nav className="flex flex-col gap-1 text-sm font-medium md:col-span-2">
+                {navItems.map((item: any, index: number) => (
+                  <div key={item.href} className="overflow-hidden">
+                    <Link
+                      href={item.href}
+                      className="group inline-block"
+                      onClick={() => setMenuOpen(false)}
                     >
-                      {item.label}
                       <span
-                        className="absolute left-0 bottom-0 h-[1px] w-full origin-left scale-x-0 bg-white transition-transform duration-300 ease-out group-hover:scale-x-100"
-                      />
-                    </span>
-                  </Link>
-                </div>
-              ))}
-            </nav>
+                        className="relative inline-block text-3xl text-white lowercase"
+                        style={{
+                          transform: menuOpen ? "translateY(0%)" : "translateY(100%)",
+                          opacity: menuOpen ? 1 : 0,
+                          transition: "transform 0.8s ease-out, opacity 0.8s ease-out",
+                          transitionDelay: menuOpen ? `${0.05 * index}s` : "0s",
+                        }}
+                      >
+                        {item.label.toLowerCase()}
+                        <span
+                          className="absolute left-0 bottom-0 h-[1px] w-full origin-left scale-x-0 bg-white transition-transform duration-300 ease-out group-hover:scale-x-100"
+                        />
+                      </span>
+                    </Link>
+                  </div>
+                ))}
+              </nav>
+            )}
 
-            <div className="flex gap-2 text-white items-end">
-              {["Instagram", "Twitter", "LinkedIn"].map((social, index) => (
-                <div key={social} className="overflow-hidden">
-                  <span
-                    className="block tracking-[0.3em]"
-                    style={{
-                      transform: menuOpen ? "translateY(0%)" : "translateY(100%)",
-                      opacity: menuOpen ? .4 : 0,
-                      transition: "transform 0.8s ease-out, opacity 0.8s ease-out",
-                      transitionDelay: menuOpen ? `${0.08 * (index + 1)}s` : "0s",
-                    }}
-                  >
-                    {social}
-                  </span>
-                </div>
-              ))}
-            </div>
+            {headerSettings?.social_items && headerSettings.social_items.length > 0 && (
+              <div className="flex gap-2 text-white items-end">
+                {headerSettings.social_items
+                  .sort((a: any, b: any) => a.order - b.order)
+                  .map((social: any, index: number) => (
+                    <div key={social.id} className="overflow-hidden">
+                      <a
+                        href={social.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block tracking-[0.3em] hover:opacity-100 transition-opacity"
+                        style={{
+                          transform: menuOpen ? "translateY(0%)" : "translateY(100%)",
+                          opacity: menuOpen ? .4 : 0,
+                          transition: "transform 0.8s ease-out, opacity 0.8s ease-out",
+                          transitionDelay: menuOpen ? `${0.08 * (index + 1)}s` : "0s",
+                        }}
+                      >
+                        {social.name}
+                      </a>
+                    </div>
+                  ))}
+              </div>
+            )}
             <div className="flex flex-col items-start justify-end gap-1 md:items-end">
               <div className="overflow-hidden">
                 <span

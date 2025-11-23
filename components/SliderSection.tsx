@@ -41,9 +41,10 @@ export default function SliderSection({ sliderItems }: SliderSectionProps) {
             src={normalizeImageUrl(currentItem.image_path || '')}
             alt={currentItem.title}
             fill
+            quality={95}
             className="object-cover"
             sizes="100vw"
-            
+            priority
             onError={(e) => console.error('Main image failed to load:', e)}
           />
           <div className="absolute left-0 top-0 w-full h-full flex items-center justify-center" style={{background: 'linear-gradient(114deg, rgba(0, 0, 0, 0.51) 0%, rgba(0, 0, 0, 0) 47.051%)'}}></div>
