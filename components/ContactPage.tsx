@@ -13,7 +13,20 @@ export default function ContactPage({ content }: ContactPageProps) {
     name: "",
     email: "",
     message: "",
+    verificationCode: "",
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' });
+  
+  // Basit matematik sorusu için state
+  const [verificationQuestion, setVerificationQuestion] = useState({ num1: 0, num2: 0, answer: 0 });
+  
+  // Verification question oluştur
+  useEffect(() => {
+    const num1 = Math.floor(Math.random() * 10) + 1;
+    const num2 = Math.floor(Math.random() * 10) + 1;
+    setVerificationQuestion({ num1, num2, answer: num1 + num2 });
+  }, []);
 
   // Title'ı kelimelere böl
   const titleWords = useMemo(() => {
@@ -32,11 +45,77 @@ export default function ContactPage({ content }: ContactPageProps) {
     return () => window.clearTimeout(timeout);
   }, [joinedTitle]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Form submit işlemi burada yapılacak
-    console.log("Form submitted:", formData);
-    // TODO: API'ye form gönder
+    setIsSubmitting(true);
+    setSubmitStatus({ type: null, message: '' });
+
+    // Verification code kontrolü
+    const userAnswer = parseInt(formData.verificationCode);
+    if (userAnswer !== verificationQuestion.answer) {
+      setSubmitStatus({ 
+        type: 'error', 
+        message: 'Verification code is incorrect. Please try again.' 
+      });
+      setIsSubmitting(false);
+      // Yeni soru oluştur
+      const num1 = Math.floor(Math.random() * 10) + 1;
+      const num2 = Math.floor(Math.random() * 10) + 1;
+      setVerificationQuestion({ num1, num2, answer: num1 + num2 });
+      setFormData({ ...formData, verificationCode: '' });
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/contact-submissions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          message: formData.message,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.details || data.error || 'Failed to send message');
+      }
+
+      setSubmitStatus({ 
+        type: 'success', 
+        message: data.message || 'Your message has been sent successfully!' 
+      });
+      
+      // Reset form
+      setFormData({
+        name: "",
+        email: "",
+        message: "",
+        verificationCode: "",
+      });
+      
+      // Yeni verification question oluştur
+      const num1 = Math.floor(Math.random() * 10) + 1;
+      const num2 = Math.floor(Math.random() * 10) + 1;
+      setVerificationQuestion({ num1, num2, answer: num1 + num2 });
+
+      // Clear success message after 5 seconds
+      setTimeout(() => {
+        setSubmitStatus({ type: null, message: '' });
+      }, 5000);
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      setSubmitStatus({ 
+        type: 'error', 
+        message: error instanceof Error ? error.message : 'Failed to send message. Please try again.' 
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -88,6 +167,18 @@ export default function ContactPage({ content }: ContactPageProps) {
           {/* Left Column - Form */}
           <div className="max-w-md">
             <h2 className="text-sm font-medium mb-5 opacity-40 uppercase">Message</h2>
+            
+            {/* Status Message */}
+            {submitStatus.type && (
+              <div className={`mb-5 p-3 rounded-md text-sm ${
+                submitStatus.type === 'success' 
+                  ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                  : 'bg-red-500/20 text-red-400 border border-red-500/30'
+              }`}>
+                {submitStatus.message}
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <input
@@ -128,11 +219,29 @@ export default function ContactPage({ content }: ContactPageProps) {
                 />
               </div>
 
+              {/* Verification Code */}
+              <div>
+                <label className="block text-xs mb-2 opacity-60">
+                  Verification: {verificationQuestion.num1} + {verificationQuestion.num2} = ?
+                </label>
+                <input
+                  type="number"
+                  id="verificationCode"
+                  value={formData.verificationCode}
+                  placeholder="Enter the answer"
+                  onChange={(e) => setFormData({ ...formData, verificationCode: e.target.value })}
+                  className="w-full p-3 text-sm border border-[#161616] rounded-md focus:outline-none focus:border-[#ffffff1a]"
+                  style={{ backgroundColor: "#161616" }}
+                  required
+                />
+              </div>
+
               <button
                 type="submit"
-                className="bg-[#ffffff0d] w-[120px] font-medium text-white text-sm py-2 rounded-xl hover:bg-[#ffffff1a] transition-colors font-medium"
+                disabled={isSubmitting}
+                className="bg-[#ffffff0d] w-[120px] font-medium text-white text-sm py-2 rounded-xl hover:bg-[#ffffff1a] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Submit
+                {isSubmitting ? 'Sending...' : 'Submit'}
               </button>
             </form>
           </div>

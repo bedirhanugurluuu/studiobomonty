@@ -2,21 +2,13 @@ const CACHE_NAME = 'studiobomonty-v1';
 const STATIC_CACHE = 'studiobomonty-static-v1';
 const API_CACHE = 'studiobomonty-api-v1';
 
-// Critical resources to cache immediately
+// Critical resources to cache immediately (only static resources)
 const urlsToCache = [
   '/',
   '/about',
   '/projects',
   '/blog',
   '/contact',
-  // Critical API endpoints
-  '/api/projects',
-  '/api/projects/featured',
-  '/api/about',
-  '/api/intro-banners',
-  '/api/news',
-  '/api/news/featured',
-  '/api/awards',
   // Critical assets
   '/fonts/switzer/Switzer-Regular.woff2',
   '/fonts/switzer/Switzer-Medium.woff2',
@@ -29,10 +21,21 @@ self.addEventListener('install', (event) => {
   
   event.waitUntil(
     Promise.all([
-      // Cache static resources
-      caches.open(STATIC_CACHE).then((cache) => {
+      // Cache static resources (handle errors individually)
+      caches.open(STATIC_CACHE).then(async (cache) => {
         console.log('Service Worker: Caching static resources');
-        return cache.addAll(urlsToCache);
+        // Cache each URL individually to prevent one failure from breaking all
+        const cachePromises = urlsToCache.map(async (url) => {
+          try {
+            await cache.add(url);
+            console.log('Service Worker: Cached', url);
+          } catch (error) {
+            console.warn('Service Worker: Failed to cache', url, error.message);
+            // Continue with other URLs even if one fails
+          }
+        });
+        await Promise.allSettled(cachePromises);
+        return cache;
       }),
       // Aggressively cache API responses on install
       caches.open(API_CACHE).then(async (cache) => {
