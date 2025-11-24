@@ -1,10 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// Helper function to get Supabase client
+function getSupabaseClient() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Missing Supabase environment variables');
+  }
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: {
+        persistSession: false,
+      },
+    }
+  );
+}
 
 export default async function handler(req, res) {
   // CORS headers
@@ -24,10 +34,11 @@ export default async function handler(req, res) {
         console.error('Missing Supabase environment variables');
         return res.status(500).json({ 
           error: 'Server configuration error',
-          details: 'Missing Supabase credentials'
+          details: 'Missing Supabase credentials. Please check Vercel environment variables.'
         });
       }
 
+      const supabase = getSupabaseClient();
       const { data, error } = await supabase
         .from('projects')
         .select('*')
@@ -42,9 +53,13 @@ export default async function handler(req, res) {
       res.json(data || []);
     } catch (error) {
       console.error('Error fetching featured projects:', error);
+      const errorMessage = error.message || 'Unknown error occurred';
+      const errorDetails = process.env.NODE_ENV === 'development' ? error.stack : undefined;
+      
       res.status(500).json({ 
         error: 'Internal server error',
-        details: error.message 
+        details: errorMessage,
+        ...(errorDetails && { stack: errorDetails })
       });
     }
   } else {

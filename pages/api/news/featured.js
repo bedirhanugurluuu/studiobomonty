@@ -1,10 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// Helper function to get Supabase client
+function getSupabaseClient() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Missing Supabase environment variables');
+  }
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: {
+        persistSession: false,
+      },
+    }
+  );
+}
 
 export default async function handler(req, res) {
   // CORS headers
@@ -24,10 +34,11 @@ export default async function handler(req, res) {
         console.error('Missing Supabase environment variables');
         return res.status(500).json({ 
           error: 'Server configuration error',
-          details: 'Missing Supabase credentials'
+          details: 'Missing Supabase credentials. Please check Vercel environment variables.'
         });
       }
 
+      const supabase = getSupabaseClient();
       // Try to fetch featured news, but if column doesn't exist, return all news
       let { data, error } = await supabase
         .from('news')

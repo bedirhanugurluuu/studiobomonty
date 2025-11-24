@@ -3,11 +3,21 @@ import formidable from 'formidable';
 import fs from 'fs/promises';
 import path from 'path';
 
-// Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// Helper function to get Supabase client
+function getSupabaseClient() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Missing Supabase environment variables');
+  }
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: {
+        persistSession: false,
+      },
+    }
+  );
+}
 
 export const config = {
   api: {
@@ -31,10 +41,11 @@ export default async function handler(req, res) {
         console.error('Missing Supabase environment variables');
         return res.status(500).json({ 
           error: 'Server configuration error',
-          details: 'Missing Supabase credentials'
+          details: 'Missing Supabase credentials. Please check Vercel environment variables.'
         });
       }
 
+      const supabase = getSupabaseClient();
       const { data, error } = await supabase
         .from('projects')
         .select('*')
@@ -48,13 +59,25 @@ export default async function handler(req, res) {
       res.json(data || []);
     } catch (err) {
       console.error('Error fetching projects:', err);
+      const errorMessage = err.message || 'Unknown error occurred';
+      const errorDetails = process.env.NODE_ENV === 'development' ? err.stack : undefined;
+      
       res.status(500).json({ 
         error: "Sunucu hatası",
-        details: err.message 
+        details: errorMessage,
+        ...(errorDetails && { stack: errorDetails })
       });
     }
   } else if (req.method === 'POST') {
     try {
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        return res.status(500).json({ 
+          error: 'Server configuration error',
+          details: 'Missing Supabase credentials. Please check Vercel environment variables.'
+        });
+      }
+
+      const supabase = getSupabaseClient();
       const form = formidable({
         uploadDir: '/tmp', // Temporary directory
         keepExtensions: true,
@@ -119,6 +142,14 @@ export default async function handler(req, res) {
     }
   } else if (req.method === 'PUT') {
     try {
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        return res.status(500).json({ 
+          error: 'Server configuration error',
+          details: 'Missing Supabase credentials. Please check Vercel environment variables.'
+        });
+      }
+
+      const supabase = getSupabaseClient();
       const form = formidable({
         uploadDir: '/tmp',
         keepExtensions: true,
@@ -204,6 +235,14 @@ export default async function handler(req, res) {
     }
   } else if (req.method === 'DELETE') {
     try {
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        return res.status(500).json({ 
+          error: 'Server configuration error',
+          details: 'Missing Supabase credentials. Please check Vercel environment variables.'
+        });
+      }
+
+      const supabase = getSupabaseClient();
       const { id } = req.query;
       
       // Delete image from storage
