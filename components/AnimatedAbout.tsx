@@ -325,6 +325,7 @@ const ClientsSection = ({ initialClientsSettings = null, initialClients = [] }: 
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [intersectionRatios, setIntersectionRatios] = useState<Map<number, number>>(new Map());
+  const [isMobile, setIsMobile] = useState(false);
   const sectionRef = useRef<HTMLElement | null>(null);
   const clientRowRefs = useRef<(HTMLDivElement | null)[]>([]);
   const imageContainerRef = useRef<HTMLDivElement | null>(null);
@@ -343,12 +344,29 @@ const ClientsSection = ({ initialClientsSettings = null, initialClients = [] }: 
     }
   }, [initialClientsSettings, initialClients.length]);
 
+  // Check if mobile (client-side only, SSR-safe)
+  useEffect(() => {
+    const checkMobile = () => {
+      if (typeof window !== 'undefined') {
+        setIsMobile(window.innerWidth < 1024);
+      }
+    };
+
+    checkMobile();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', checkMobile);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', checkMobile);
+      }
+    };
+  }, []);
+
   // IntersectionObserver for mobile scroll-based active client
   useEffect(() => {
-    if (clients.length === 0) return;
-
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
-    if (!isMobile) return; // Only for mobile
+    if (clients.length === 0 || !isMobile) return; // Only for mobile
 
     const ratios = new Map<number, number>();
 
@@ -417,11 +435,10 @@ const ClientsSection = ({ initialClientsSettings = null, initialClients = [] }: 
         if (el) clientObserver.unobserve(el);
       });
     };
-  }, [clients.length]);
+  }, [clients.length, isMobile]);
 
   // Desktop hover effect
   useEffect(() => {
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
     if (isMobile) return; // Only for desktop
 
     if (hoveredIndex !== null && clientRowRefs.current[hoveredIndex]) {
@@ -506,21 +523,56 @@ const ClientsSection = ({ initialClientsSettings = null, initialClients = [] }: 
         }
       }
     }
-  }, [hoveredIndex]);
+  }, [hoveredIndex, isMobile]);
 
   if (!settings || clients.length === 0) return null;
 
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
   const activeClient = isMobile 
     ? (activeIndex !== null ? clients[activeIndex] : null)
     : (hoveredIndex !== null ? clients[hoveredIndex] : null);
 
-  const activeMediaUrl = activeClient?.image_path ? normalizeImageUrl(activeClient.image_path) : null;
-  const activeIsVideo =
-    activeMediaUrl &&
-    (activeMediaUrl.toLowerCase().endsWith(".mp4") ||
-      activeMediaUrl.toLowerCase().endsWith(".webm") ||
-      activeMediaUrl.toLowerCase().endsWith(".mov"));
+  // Pre-process all media URLs and types
+  const clientMedia = useMemo(() => {
+    return clients.map((client) => {
+      const mediaUrl = normalizeImageUrl(client.image_path || "");
+      const isVideo =
+        mediaUrl &&
+        (mediaUrl.toLowerCase().endsWith(".mp4") ||
+          mediaUrl.toLowerCase().endsWith(".webm") ||
+          mediaUrl.toLowerCase().endsWith(".mov"));
+      return {
+        url: mediaUrl,
+        isVideo: !!isVideo,
+        name: client.name,
+        orderIndex: client.order_index,
+      };
+    });
+  }, [clients]);
+
+  // Preload all client images when component mounts
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const links: HTMLLinkElement[] = [];
+    clientMedia.forEach((media) => {
+      if (!media.isVideo && media.url) {
+        const link = document.createElement('link');
+        link.rel = 'preload';
+        link.as = 'image';
+        link.href = media.url;
+        document.head.appendChild(link);
+        links.push(link);
+      }
+    });
+
+    return () => {
+      links.forEach((link) => {
+        if (document.head.contains(link)) {
+          document.head.removeChild(link);
+        }
+      });
+    };
+  }, [clientMedia]);
 
   return (
     <section ref={sectionRef} className="px-4 py-24">
@@ -528,7 +580,7 @@ const ClientsSection = ({ initialClientsSettings = null, initialClients = [] }: 
         <h2 className="text-xl uppercase font-medium">{settings.title}</h2>
       </div>
       
-      <div className="relative grid gap-12 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="relative grid gap-12 ">
         {/* Left: Client Names */}
         <div className="relative py-5 md:px-4">
           {/* Desktop: Sol ve sağ absolute görsel/order alanları */}
@@ -540,14 +592,30 @@ const ClientsSection = ({ initialClientsSettings = null, initialClients = [] }: 
                 className="absolute left-0 flex items-center"
                 style={{ transform: 'translateY(-20px)' }}
               >
-                {activeClient?.image_path && (
-                  <img
-                    src={normalizeImageUrl(activeClient.image_path)}
-                    alt={activeClient.name}
-                    className="w-38 h-25 object-cover opacity-0"
-                    style={{ borderRadius: '4px' }}
-                  />
-                )}
+                <div className="relative w-38 h-25" style={{ borderRadius: '4px', overflow: 'hidden' }}>
+                  {hoveredIndex !== null && clientMedia[hoveredIndex]?.url && (
+                    <>
+                      {clientMedia[hoveredIndex].isVideo ? (
+                        <video
+                          key={`desktop-client-video-${hoveredIndex}`}
+                          src={clientMedia[hoveredIndex].url}
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <img
+                          key={`desktop-client-image-${hoveredIndex}`}
+                          src={clientMedia[hoveredIndex].url}
+                          alt={clientMedia[hoveredIndex].name}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
 
               {/* Sağ: Tek order alanı - absolute */}
@@ -592,42 +660,46 @@ const ClientsSection = ({ initialClientsSettings = null, initialClients = [] }: 
 
         {/* Right: Mobile Sticky Media Preview */}
         {isMobile && (
-          <div className="banner-sticky-">
+          <div className="banner-sticky-client">
             <div className="sticky top-[100px] flex w-full items-center justify-center">
               <div className="relative w-full overflow-hidden rounded-[10px] bg-black/20">
-                {activeIndex !== null && activeMediaUrl ? (
-                  activeIsVideo ? (
-                    <video
-                      key={activeMediaUrl}
-                      src={activeMediaUrl}
-                      autoPlay
-                      muted
-                      loop
-                      playsInline
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <Image
-                      key={activeMediaUrl}
-                      src={activeMediaUrl}
-                      alt={activeClient?.name || "Client"}
-                      width={1200}
-                      height={800}
-                      className="h-full w-full object-cover"
-                      priority
-                    />
-                  )
+                {activeIndex !== null && clientMedia[activeIndex]?.url ? (
+                  <>
+                    {clientMedia[activeIndex].isVideo ? (
+                      <video
+                        key={`mobile-client-video-${activeIndex}`}
+                        src={clientMedia[activeIndex].url}
+                        autoPlay
+                        muted
+                        loop
+                        playsInline
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <Image
+                        key={`mobile-client-image-${activeIndex}`}
+                        src={clientMedia[activeIndex].url}
+                        alt={clientMedia[activeIndex].name}
+                        width={1200}
+                        height={800}
+                        quality={95}
+                        sizes="(max-width: 768px) 100vw, 50vw"
+                        className="h-full w-full object-cover"
+                        priority={activeIndex === 0}
+                      />
+                    )}
+                    {/* Order gösterimi */}
+                    {clientMedia[activeIndex].orderIndex && (
+                      <div className="absolute bottom-4 right-4 z-10">
+                        <span className="text-sm uppercase text-white">
+                          {clientMedia[activeIndex].orderIndex}
+                        </span>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-white/10 text-white/60">
                     {activeIndex === null ? "" : "No image"}
-                  </div>
-                )}
-                {/* Order gösterimi */}
-                {activeClient?.order_index && (
-                  <div className="absolute bottom-4 right-4">
-                    <span className="text-sm uppercase text-white">
-                      {activeClient.order_index}
-                    </span>
                   </div>
                 )}
               </div>
@@ -705,6 +777,7 @@ const ServicesSection = ({ initialServices = [] }: ServicesSectionProps) => {
   const [services, setServices] = useState<Service[]>(initialServices);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [intersectionRatios, setIntersectionRatios] = useState<Map<number, number>>(new Map());
+  const [isMobile, setIsMobile] = useState(false);
   const sectionRef = useRef<HTMLElement | null>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -719,6 +792,26 @@ const ServicesSection = ({ initialServices = [] }: ServicesSectionProps) => {
         });
     }
   }, [initialServices.length]);
+
+  // Check if mobile (client-side only, SSR-safe)
+  useEffect(() => {
+    const checkMobile = () => {
+      if (typeof window !== 'undefined') {
+        setIsMobile(window.innerWidth < 768);
+      }
+    };
+
+    checkMobile();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', checkMobile);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', checkMobile);
+      }
+    };
+  }, []);
 
   // IntersectionObserver to track which service is currently in view
   useEffect(() => {
@@ -743,7 +836,6 @@ const ServicesSection = ({ initialServices = [] }: ServicesSectionProps) => {
     );
 
     // Her servisin görünürlüğünü kontrol et
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
     const serviceObserver = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -793,19 +885,54 @@ const ServicesSection = ({ initialServices = [] }: ServicesSectionProps) => {
         if (el) serviceObserver.unobserve(el);
       });
     };
-  }, [services.length]);
+  }, [services.length, isMobile]);
 
   const activeService = useMemo(() => {
     if (services.length === 0 || activeIndex === null) return null;
     return services[activeIndex];
   }, [activeIndex, services]);
 
-  const activeMediaUrl = activeService?.image_path ? normalizeImageUrl(activeService.image_path) : null;
-  const activeIsVideo =
-    activeMediaUrl &&
-    (activeMediaUrl.toLowerCase().endsWith(".mp4") ||
-      activeMediaUrl.toLowerCase().endsWith(".webm") ||
-      activeMediaUrl.toLowerCase().endsWith(".mov"));
+  // Pre-process all media URLs and types
+  const serviceMedia = useMemo(() => {
+    return services.map((service) => {
+      const mediaUrl = normalizeImageUrl(service.image_path || "");
+      const isVideo =
+        mediaUrl &&
+        (mediaUrl.toLowerCase().endsWith(".mp4") ||
+          mediaUrl.toLowerCase().endsWith(".webm") ||
+          mediaUrl.toLowerCase().endsWith(".mov"));
+      return {
+        url: mediaUrl,
+        isVideo: !!isVideo,
+        name: service.name,
+      };
+    });
+  }, [services]);
+
+  // Preload all service images when component mounts
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const links: HTMLLinkElement[] = [];
+    serviceMedia.forEach((media) => {
+      if (!media.isVideo && media.url) {
+        const link = document.createElement('link');
+        link.rel = 'preload';
+        link.as = 'image';
+        link.href = media.url;
+        document.head.appendChild(link);
+        links.push(link);
+      }
+    });
+
+    return () => {
+      links.forEach((link) => {
+        if (document.head.contains(link)) {
+          document.head.removeChild(link);
+        }
+      });
+    };
+  }, [serviceMedia]);
 
   return (
     <section ref={sectionRef} className="px-4 py-24">
@@ -843,28 +970,32 @@ const ServicesSection = ({ initialServices = [] }: ServicesSectionProps) => {
         <div className="banner-sticky-media md:relative">
           <div className="sticky top-[100px] flex w-full items-center justify-center">
             <div className="relative w-full overflow-hidden rounded-[10px] bg-black/20">
-              {activeIndex !== null && activeMediaUrl ? (
-                activeIsVideo ? (
-                  <video
-                    key={activeMediaUrl}
-                    src={activeMediaUrl}
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <Image
-                    key={activeMediaUrl}
-                    src={activeMediaUrl}
-                    alt={activeService?.name || "Service"}
-                    width={1200}
-                    height={800}
-                    className="h-full w-full object-cover"
-                    priority
-                  />
-                )
+              {activeIndex !== null && serviceMedia[activeIndex] ? (
+                <>
+                  {serviceMedia[activeIndex].isVideo ? (
+                    <video
+                      key={`service-video-${activeIndex}`}
+                      src={serviceMedia[activeIndex].url}
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <Image
+                      key={`service-image-${activeIndex}`}
+                      src={serviceMedia[activeIndex].url}
+                      alt={serviceMedia[activeIndex].name}
+                      width={1200}
+                      height={800}
+                      quality={95}
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                      className="h-full w-full object-cover"
+                      priority={activeIndex === 0}
+                    />
+                  )}
+                </>
               ) : (
                 <div className="flex h-full w-full items-center justify-center bg-white/10 text-white/60">
                   {activeIndex === null ? "" : "No image"}

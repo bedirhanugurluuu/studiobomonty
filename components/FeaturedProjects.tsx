@@ -70,13 +70,46 @@ const FeaturedProjects = ({ initialProjects = [] }: FeaturedProjectsProps) => {
 
 	if (projects.length === 0 || !activeProject) return null;
 
-	const activeMediaUrl = normalizeImageUrl(
-		activeProject.banner_media || ""
-	);
-	const activeIsVideo =
-		activeMediaUrl.toLowerCase().endsWith(".mp4") ||
-		activeMediaUrl.toLowerCase().endsWith(".webm") ||
-		activeMediaUrl.toLowerCase().endsWith(".mov");
+	// Pre-process all media URLs and types
+	const projectMedia = useMemo(() => {
+		return projects.map((project) => {
+			const mediaUrl = normalizeImageUrl(project.banner_media || "");
+			const isVideo =
+				mediaUrl.toLowerCase().endsWith(".mp4") ||
+				mediaUrl.toLowerCase().endsWith(".webm") ||
+				mediaUrl.toLowerCase().endsWith(".mov");
+			return {
+				url: mediaUrl,
+				isVideo,
+				title: project.title,
+			};
+		});
+	}, [projects]);
+
+	// Preload all images when component mounts
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		
+		const links: HTMLLinkElement[] = [];
+		projectMedia.forEach((media) => {
+			if (!media.isVideo && media.url) {
+				const link = document.createElement('link');
+				link.rel = 'preload';
+				link.as = 'image';
+				link.href = media.url;
+				document.head.appendChild(link);
+				links.push(link);
+			}
+		});
+
+		return () => {
+			links.forEach((link) => {
+				if (document.head.contains(link)) {
+					document.head.removeChild(link);
+				}
+			});
+		};
+	}, [projectMedia]);
 
 	// Section and text container refs for height calculation (mobile only)
 	const sectionRef = useRef<HTMLElement>(null);
@@ -225,28 +258,32 @@ const FeaturedProjects = ({ initialProjects = [] }: FeaturedProjectsProps) => {
 								}}
 							>
 								<div className="relative w-full h-full overflow-hidden rounded-[10px] bg-black/20">
-									{activeIsVideo ? (
-										<video
-											key={activeMediaUrl}
-											src={activeMediaUrl}
-											autoPlay
-											muted
-											loop
-											playsInline
-											className="h-full w-full object-cover"
-										/>
-									) : (
-										<Image
-											key={activeMediaUrl}
-											src={activeMediaUrl}
-											alt={activeProject.title}
-											width={1200}
-											height={800}
-											quality={95}
-											sizes="(max-width: 768px) 100vw, 50vw"
-											className="h-full w-full object-cover"
-											priority
-										/>
+									{projectMedia[activeIndex] && (
+										<>
+											{projectMedia[activeIndex].isVideo ? (
+												<video
+													key={`mobile-video-${activeIndex}`}
+													src={projectMedia[activeIndex].url}
+													autoPlay
+													muted
+													loop
+													playsInline
+													className="h-full w-full object-cover"
+												/>
+											) : (
+												<Image
+													key={`mobile-image-${activeIndex}`}
+													src={projectMedia[activeIndex].url}
+													alt={projectMedia[activeIndex].title}
+													width={1200}
+													height={800}
+													quality={95}
+													sizes="(max-width: 768px) 100vw, 50vw"
+													className="h-full w-full object-cover"
+													priority={activeIndex === 0}
+												/>
+											)}
+										</>
 									)}
 								</div>
 							</div>
@@ -254,28 +291,32 @@ const FeaturedProjects = ({ initialProjects = [] }: FeaturedProjectsProps) => {
 					) : (
 						<div className="relative md:sticky top-0 flex md:h-screen w-full items-center justify-center">
 							<div className="relative w-full overflow-hidden rounded-[10px] bg-black/20">
-								{activeIsVideo ? (
-									<video
-										key={activeMediaUrl}
-										src={activeMediaUrl}
-										autoPlay
-										muted
-										loop
-										playsInline
-										className="h-full w-full object-cover"
-									/>
-								) : (
-									<Image
-										key={activeMediaUrl}
-										src={activeMediaUrl}
-										alt={activeProject.title}
-										width={1200}
-										height={800}
-										quality={95}
-										sizes="(max-width: 768px) 100vw, 50vw"
-										className="h-full w-full object-cover"
-										priority
-									/>
+								{projectMedia[activeIndex] && (
+									<>
+										{projectMedia[activeIndex].isVideo ? (
+											<video
+												key={`desktop-video-${activeIndex}`}
+												src={projectMedia[activeIndex].url}
+												autoPlay
+												muted
+												loop
+												playsInline
+												className="h-full w-full object-cover"
+											/>
+										) : (
+											<Image
+												key={`desktop-image-${activeIndex}`}
+												src={projectMedia[activeIndex].url}
+												alt={projectMedia[activeIndex].title}
+												width={1200}
+												height={800}
+												quality={95}
+												sizes="(max-width: 768px) 100vw, 50vw"
+												className="h-full w-full object-cover"
+												priority={activeIndex === 0}
+											/>
+										)}
+									</>
 								)}
 							</div>
 						</div>
