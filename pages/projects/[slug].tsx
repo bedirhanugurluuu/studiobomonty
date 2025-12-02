@@ -108,9 +108,13 @@ export default function ProjectDetail({ project, moreProjects, galleryImages, te
         }}
       >
         <div className="relative w-full overflow-hidden md:rounded-[10px]" style={{ height: "calc(100vh - 30px)" }}>
-          {project.banner_media && (
+          {(isMobile && project.mobile_image_url ? project.mobile_image_url : project.banner_media) && (
             <Image
-              src={normalizeImageUrl(project.banner_media)}
+              src={normalizeImageUrl(
+                isMobile && project.mobile_image_url 
+                  ? project.mobile_image_url 
+                  : project.banner_media
+              )}
               alt="Banner"
               fill
               quality={95}

@@ -38,7 +38,7 @@ export default function Header() {
 
     const updateTime = () => {
       const formatted = formatter.format(new Date());
-      setIstanbulTime(`${formatted} İST`);
+      setIstanbulTime(`${formatted} IST`);
     };
 
     updateTime();
@@ -148,8 +148,19 @@ export default function Header() {
             className="flex items-center"
             onClick={() => setMenuOpen(false)}
           >
+            {/* Logo'yu direkt images klasöründen çekiyoruz */}
+            <div className="relative h-6 w-41">
+              <Image
+                src="/images/logo.png"
+                alt="Logo"
+                fill
+                className="object-contain"
+                priority
+              />
+            </div>
+            {/* Panelden logo çekme - şimdilik yorum satırında
             {headerSettings?.logo_image_url ? (
-              <div className="relative h-6 w-20">
+              <div className="relative h-6 w-36">
                 <Image
                   src={headerSettings.logo_image_url}
                   alt="Logo"
@@ -167,12 +178,13 @@ export default function Header() {
                 StudioBomonty
               </span>
             )}
+            */}
           </Link>
 
           {primaryNavItems.length > 0 && (
             <nav
               className={clsx(
-                "hidden md:flex items-center gap-6 text-xs font-medium uppercase transition-opacity duration-300",
+                "hidden md:flex items-center gap-6 text-sm font-medium uppercase transition-opacity duration-300",
                 menuOpen && "opacity-0 pointer-events-none"
               )}
             >

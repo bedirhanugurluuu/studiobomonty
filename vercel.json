@@ -47,5 +47,11 @@
     "pages/api/**.js": {
       "maxDuration": 10
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/keep-alive",
+      "schedule": "0 */12 * * *"
+    }
+  ]
 }

@@ -12,6 +12,7 @@ const isVideoUrl = (url: string) => /\.(mp4|webm|ogg|mov)$/i.test(url);
 
 export default function IntroBanner({ initialBanner = null }: IntroBannerProps) {
   const [banner, setBanner] = useState<IntroBannerType | null>(initialBanner ?? null);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     if (initialBanner) {
@@ -27,10 +28,24 @@ export default function IntroBanner({ initialBanner = null }: IntroBannerProps) 
     }
   }, [banner]);
 
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   const mediaUrl = useMemo(() => {
-    if (!banner?.image) return null;
-    return normalizeImageUrl(banner.image);
-  }, [banner?.image]);
+    if (isMobile && banner?.mobile_image_url) {
+      return normalizeImageUrl(banner.mobile_image_url);
+    }
+    if (banner?.image) {
+      return normalizeImageUrl(banner.image);
+    }
+    return null;
+  }, [banner?.image, banner?.mobile_image_url, isMobile]);
 
   const isVideo = useMemo(() => {
     if (!mediaUrl) return false;

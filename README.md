@@ -99,28 +99,14 @@ cp env.example .env.local
 cp temp-admin-panel/env.example temp-admin-panel/.env
 ```
 
-### 4. Configure Environment Variables
-
-#### Main Project (.env.local)
-```bash
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
-
-#### Admin Panel (temp-admin-panel/.env)
-```bash
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
-
-### 5. Database Setup
+### 4. Database Setup
 Run the SQL scripts in your Supabase SQL editor:
 
 1. **Database Schema**: `database_setup.sql`
 2. **Newsletter Setup**: `newsletter_setup_safe.sql`
 3. **RLS Policies**: `newsletter_policies.sql`
 
-### 6. Development
+### 5. Development
 ```bash
 # Frontend (Next.js)
 npm run dev
@@ -143,20 +129,6 @@ npm run dev
 1. Create separate Vercel project for admin panel
 2. Set environment variables
 3. Deploy from `temp-admin-panel` directory
-
-### Environment Variables for Production
-
-#### Frontend (Vercel)
-```bash
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-```
-
-#### Admin Panel (Vercel)
-```bash
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your_anon_key
-```
 
 ## 📁 Content Management
 
@@ -255,9 +227,6 @@ VITE_SUPABASE_ANON_KEY=your_anon_key
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🆘 Support
 
