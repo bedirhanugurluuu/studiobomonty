@@ -86,21 +86,36 @@ const FeaturedProjects = ({ initialProjects = [] }: FeaturedProjectsProps) => {
 		});
 	}, [projects]);
 
-	// Preload all images when component mounts
+	// Preload all images when component mounts and preload next image when activeIndex changes
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 		
 		const links: HTMLLinkElement[] = [];
+		
+		// Preload all images
 		projectMedia.forEach((media) => {
 			if (!media.isVideo && media.url) {
 				const link = document.createElement('link');
 				link.rel = 'preload';
 				link.as = 'image';
 				link.href = media.url;
+				link.fetchPriority = 'high';
 				document.head.appendChild(link);
 				links.push(link);
 			}
 		});
+
+		// Preload next image proactively
+		const nextIndex = activeIndex + 1;
+		if (nextIndex < projectMedia.length && !projectMedia[nextIndex].isVideo && projectMedia[nextIndex].url) {
+			const nextLink = document.createElement('link');
+			nextLink.rel = 'preload';
+			nextLink.as = 'image';
+			nextLink.href = projectMedia[nextIndex].url;
+			nextLink.fetchPriority = 'high';
+			document.head.appendChild(nextLink);
+			links.push(nextLink);
+		}
 
 		return () => {
 			links.forEach((link) => {
@@ -109,7 +124,7 @@ const FeaturedProjects = ({ initialProjects = [] }: FeaturedProjectsProps) => {
 				}
 			});
 		};
-	}, [projectMedia]);
+	}, [projectMedia, activeIndex]);
 
 	// Section and text container refs for height calculation (mobile only)
 	const sectionRef = useRef<HTMLElement>(null);
@@ -280,7 +295,8 @@ const FeaturedProjects = ({ initialProjects = [] }: FeaturedProjectsProps) => {
 													quality={95}
 													sizes="(max-width: 768px) 100vw, 50vw"
 													className="h-full w-full object-cover"
-													priority={activeIndex === 0}
+													priority={true}
+													loading="eager"
 												/>
 											)}
 										</>
@@ -313,7 +329,8 @@ const FeaturedProjects = ({ initialProjects = [] }: FeaturedProjectsProps) => {
 												quality={95}
 												sizes="(max-width: 768px) 100vw, 50vw"
 												className="h-full w-full object-cover"
-												priority={activeIndex === 0}
+												priority={true}
+												loading="eager"
 											/>
 										)}
 									</>

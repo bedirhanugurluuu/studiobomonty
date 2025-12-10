@@ -22,7 +22,6 @@ export default function ProjectDetail({ project, moreProjects, galleryImages, te
   // Animation state
   const [animateContent, setAnimateContent] = useState(false);
   const [animateBottomContent, setAnimateBottomContent] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
 
   // Split title and subtitle into words for animation
   const titleWords = useMemo(() => {
@@ -43,16 +42,6 @@ export default function ProjectDetail({ project, moreProjects, galleryImages, te
 
   const joinedTitle = useMemo(() => titleWords.join(" "), [titleWords]);
   const joinedSubtitle = useMemo(() => subtitleWords.join(" "), [subtitleWords]);
-
-  // Set isMobile on client-side only
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   // Trigger animations on mount
   useEffect(() => {
@@ -100,28 +89,48 @@ export default function ProjectDetail({ project, moreProjects, galleryImages, te
       <div className="w-full">
       {/* Banner or Video Section */}
       <section 
-        className={`relative w-full overflow-hidden ${!isMobile ? 'transition-[padding] duration-500 ease-out' : ''}`}
-        style={{ 
-          padding: isMobile 
-            ? "0px" 
-            : (animateContent ? "15px" : "0px")
-        }}
+        className={`relative w-full overflow-hidden lg:transition-[padding] lg:duration-500 lg:ease-out ${animateContent ? 'lg:p-[15px]' : ''}`}
       >
         <div className="relative w-full overflow-hidden md:rounded-[10px]" style={{ height: "calc(100vh - 30px)" }}>
-          {(isMobile && project.mobile_image_url ? project.mobile_image_url : project.banner_media) && (
+          {/* Desktop Banner */}
+          {project.banner_media && (
             <Image
-              src={normalizeImageUrl(
-                isMobile && project.mobile_image_url 
-                  ? project.mobile_image_url 
-                  : project.banner_media
-              )}
+              src={normalizeImageUrl(project.banner_media)}
               alt="Banner"
               fill
               quality={95}
               sizes="100vw"
               style={{ objectFit: "cover", minHeight: "calc(100vh - 30px)" }}
               priority
-              className="object-cover"
+              className="object-cover hidden lg:block"
+            />
+          )}
+          
+          {/* Mobile Banner */}
+          {project.mobile_image_url && (
+            <Image
+              src={normalizeImageUrl(project.mobile_image_url)}
+              alt="Banner"
+              fill
+              quality={95}
+              sizes="100vw"
+              style={{ objectFit: "cover", minHeight: "calc(100vh - 30px)" }}
+              priority
+              className="object-cover block lg:hidden"
+            />
+          )}
+          
+          {/* Fallback: If no mobile image, show desktop on mobile too */}
+          {!project.mobile_image_url && project.banner_media && (
+            <Image
+              src={normalizeImageUrl(project.banner_media)}
+              alt="Banner"
+              fill
+              quality={95}
+              sizes="100vw"
+              style={{ objectFit: "cover", minHeight: "calc(100vh - 30px)" }}
+              priority
+              className="object-cover block lg:hidden"
             />
           )}
 

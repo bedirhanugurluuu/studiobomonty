@@ -1,8 +1,8 @@
 import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
-import { fetchProjectsSSR, normalizeImageUrl } from "@/lib/api";
-import React from "react";
+import { fetchProjectsSSR, fetchProjectTabsSSR, normalizeImageUrl, ProjectTab } from "@/lib/api";
+import React, { useState, useEffect } from "react";
 import { GetStaticProps } from "next";
 import SEO from "@/components/SEO";
 
@@ -22,15 +22,24 @@ interface Project {
   display_order?: number; // Proje sıralaması için
   tab1?: string;
   tab2?: string;
+  project_tab_id?: string;
   created_at: string;
   updated_at: string;
 }
 
 type Props = {
   projects: Project[];
+  tabs: ProjectTab[];
 };
 
-export default function ProjectsPage({ projects }: Props) {
+export default function ProjectsPage({ projects: initialProjects, tabs: initialTabs }: Props) {
+  const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
+  const [tabs, setTabs] = useState<ProjectTab[]>(initialTabs);
+  
+  // Filter projects based on selected tab
+  const filteredProjects = selectedTabId
+    ? initialProjects.filter(project => project.project_tab_id === selectedTabId)
+    : initialProjects;
   const normalizeMedia = (path: string) => {
     if (!path) return { type: "unknown", url: "" };
     const fullUrl = normalizeImageUrl(path);
@@ -48,8 +57,8 @@ export default function ProjectsPage({ projects }: Props) {
     "url": "https://studiobomonty.vercel.app/projects",
     "mainEntity": {
       "@type": "ItemList",
-      "numberOfItems": projects.length,
-      "itemListElement": projects.map((project, index) => ({
+      "numberOfItems": initialProjects.length,
+      "itemListElement": initialProjects.map((project: Project, index: number) => ({
         "@type": "ListItem",
         "position": index + 1,
         "item": {
@@ -79,14 +88,51 @@ export default function ProjectsPage({ projects }: Props) {
       <div className="min-h-screen px-4 pt-50 pb-10">
       {/* Header */}
       <div className="mb-10">
-        <h1 className="text-3xl md:text-5xl font-medium uppercase">
-          Projects
-        </h1>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <h1 className="text-3xl md:text-5xl font-medium uppercase">
+            Projects
+          </h1>
+          
+          {/* Tabs */}
+          {tabs.length > 0 && (
+            <div className="flex flex-wrap gap-2 justify-start md:justify-end">
+              <button
+                onClick={() => setSelectedTabId(null)}
+                className={`px-4 py-2 rounded-sm text-sm font-semibold transition-all ${
+                  selectedTabId === null
+                    ? "bg-white text-black"
+                    : "bg-transparent text-white border border-white/20 hover:bg-white/10"
+                }`}
+              >
+                All
+              </button>
+              {tabs.map((tab) => {
+                const tabProjectsCount = initialProjects.filter(p => p.project_tab_id === tab.id).length;
+                if (tabProjectsCount === 0) return null;
+                
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setSelectedTabId(tab.id)}
+                    className={`px-4 py-2 rounded-sm text-sm font-semibold transition-all ${
+                      selectedTabId === tab.id
+                        ? "bg-white text-black"
+                        : "bg-transparent text-white border border-white/20 hover:bg-white/10"
+                    }`}
+                  >
+                    {tab.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* GRID VIEW */}
       <motion.div layout className="grid lg:grid-cols-3 md:grid-cols-2 sm:grid-cols-1 gap-5">
-          {projects.map((project, i) => {
+          {filteredProjects.length > 0 ? (
+            filteredProjects.map((project, i) => {
             const media = normalizeMedia(project.banner_media || "");
 
             return (
@@ -161,7 +207,12 @@ export default function ProjectsPage({ projects }: Props) {
                 </motion.div>
               </Link>
             );
-          })}
+          })
+          ) : (
+            <div className="col-span-full text-center py-20">
+              <p className="text-white/50 text-lg">Bu kategoride proje bulunmuyor.</p>
+            </div>
+          )}
       </motion.div>
       </div>
     </>
@@ -171,11 +222,15 @@ export default function ProjectsPage({ projects }: Props) {
 // SSG ile veri çekmek için:
 export const getStaticProps: GetStaticProps = async () => {
   try {
-    const projects = await fetchProjectsSSR();
+    const [projects, tabs] = await Promise.all([
+      fetchProjectsSSR(),
+      fetchProjectTabsSSR()
+    ]);
 
     return {
       props: {
         projects,
+        tabs: tabs || [],
       },
       revalidate: 300 // 5 dakikada bir yenile
     };
@@ -184,6 +239,7 @@ export const getStaticProps: GetStaticProps = async () => {
     return {
       props: {
         projects: [],
+        tabs: [],
       },
       revalidate: 300
     };

@@ -14,6 +14,7 @@ export interface Project {
   client_name?: string;
   tab1?: string;
   tab2?: string;
+  project_tab_id?: string;
   external_link?: string;
   slug: string;
   created_at: string;
@@ -253,6 +254,28 @@ export async function fetchProjectsSSR(): Promise<Project[]> {
   return fetchProjects();
 }
 
+export interface ProjectTab {
+  id: string;
+  name: string;
+  order_index: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function fetchProjectTabs(): Promise<ProjectTab[]> {
+  const { data, error } = await supabase
+    .from('project_tabs')
+    .select('*')
+    .order('order_index', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function fetchProjectTabsSSR(): Promise<ProjectTab[]> {
+  return fetchProjectTabs();
+}
+
 export async function fetchFeaturedProjects(): Promise<Project[]> {
   const { data, error } = await supabase
     .from('projects')
@@ -281,12 +304,19 @@ export async function fetchProjectBySlug(slug: string): Promise<Project | null> 
 export async function fetchProjectGallery(projectId: string): Promise<string[]> {
   const { data, error } = await supabase
     .from('project_gallery')
-    .select('image_path')
-    .eq('project_id', projectId)
-    .order('sort', { ascending: true });
+    .select('image_path, sort')
+    .eq('project_id', projectId);
 
   if (error) throw error;
-  return data?.map(item => item.image_path) || [];
+  
+  // Numeric sıralama yap (string sıralama problemi için)
+  const sorted = (data || []).sort((a, b) => {
+    const sortA = typeof a.sort === 'number' ? a.sort : parseInt(a.sort) || 0;
+    const sortB = typeof b.sort === 'number' ? b.sort : parseInt(b.sort) || 0;
+    return sortA - sortB;
+  });
+  
+  return sorted.map(item => item.image_path) || [];
 }
 
 export async function fetchProjectTeamMembers(projectId: string): Promise<ProjectTeamMember[]> {

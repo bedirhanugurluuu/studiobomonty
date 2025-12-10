@@ -549,21 +549,38 @@ const ClientsSection = ({ initialClientsSettings = null, initialClients = [] }: 
     });
   }, [clients]);
 
-  // Preload all client images when component mounts
+  // Preload all client images when component mounts and preload next image when activeIndex changes
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
     const links: HTMLLinkElement[] = [];
+    
+    // Preload all images
     clientMedia.forEach((media) => {
       if (!media.isVideo && media.url) {
         const link = document.createElement('link');
         link.rel = 'preload';
         link.as = 'image';
         link.href = media.url;
+        (link as any).fetchPriority = 'high';
         document.head.appendChild(link);
         links.push(link);
       }
     });
+
+    // Preload next image proactively
+    if (activeIndex !== null) {
+      const nextIndex = activeIndex + 1;
+      if (nextIndex < clientMedia.length && !clientMedia[nextIndex].isVideo && clientMedia[nextIndex].url) {
+        const nextLink = document.createElement('link');
+        nextLink.rel = 'preload';
+        nextLink.as = 'image';
+        nextLink.href = clientMedia[nextIndex].url;
+        (nextLink as any).fetchPriority = 'high';
+        document.head.appendChild(nextLink);
+        links.push(nextLink);
+      }
+    }
 
     return () => {
       links.forEach((link) => {
@@ -572,7 +589,7 @@ const ClientsSection = ({ initialClientsSettings = null, initialClients = [] }: 
         }
       });
     };
-  }, [clientMedia]);
+  }, [clientMedia, activeIndex]);
 
   return (
     <section ref={sectionRef} className="px-4 py-24">
@@ -685,7 +702,8 @@ const ClientsSection = ({ initialClientsSettings = null, initialClients = [] }: 
                         quality={95}
                         sizes="(max-width: 768px) 100vw, 50vw"
                         className="h-full w-full object-cover"
-                        priority={activeIndex === 0}
+                        priority={true}
+                        loading="eager"
                       />
                     )}
                     {/* Order gösterimi */}
@@ -909,21 +927,38 @@ const ServicesSection = ({ initialServices = [] }: ServicesSectionProps) => {
     });
   }, [services]);
 
-  // Preload all service images when component mounts
+  // Preload all service images when component mounts and preload next image when activeIndex changes
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
     const links: HTMLLinkElement[] = [];
+    
+    // Preload all images
     serviceMedia.forEach((media) => {
       if (!media.isVideo && media.url) {
         const link = document.createElement('link');
         link.rel = 'preload';
         link.as = 'image';
         link.href = media.url;
+        (link as any).fetchPriority = 'high';
         document.head.appendChild(link);
         links.push(link);
       }
     });
+
+    // Preload next image proactively
+    if (activeIndex !== null) {
+      const nextIndex = activeIndex + 1;
+      if (nextIndex < serviceMedia.length && !serviceMedia[nextIndex].isVideo && serviceMedia[nextIndex].url) {
+        const nextLink = document.createElement('link');
+        nextLink.rel = 'preload';
+        nextLink.as = 'image';
+        nextLink.href = serviceMedia[nextIndex].url;
+        (nextLink as any).fetchPriority = 'high';
+        document.head.appendChild(nextLink);
+        links.push(nextLink);
+      }
+    }
 
     return () => {
       links.forEach((link) => {
@@ -932,7 +967,7 @@ const ServicesSection = ({ initialServices = [] }: ServicesSectionProps) => {
         }
       });
     };
-  }, [serviceMedia]);
+  }, [serviceMedia, activeIndex]);
 
   return (
     <section ref={sectionRef} className="px-4 py-24">
@@ -992,7 +1027,8 @@ const ServicesSection = ({ initialServices = [] }: ServicesSectionProps) => {
                       quality={95}
                       sizes="(max-width: 768px) 100vw, 50vw"
                       className="h-full w-full object-cover"
-                      priority={activeIndex === 0}
+                      priority={true}
+                      loading="eager"
                     />
                   )}
                 </>

@@ -12,7 +12,6 @@ const isVideoUrl = (url: string) => /\.(mp4|webm|ogg|mov)$/i.test(url);
 
 export default function IntroBanner({ initialBanner = null }: IntroBannerProps) {
   const [banner, setBanner] = useState<IntroBannerType | null>(initialBanner ?? null);
-  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     if (initialBanner) {
@@ -27,30 +26,6 @@ export default function IntroBanner({ initialBanner = null }: IntroBannerProps) 
         .catch(() => setBanner(null));
     }
   }, [banner]);
-
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  const mediaUrl = useMemo(() => {
-    if (isMobile && banner?.mobile_image_url) {
-      return normalizeImageUrl(banner.mobile_image_url);
-    }
-    if (banner?.image) {
-      return normalizeImageUrl(banner.image);
-    }
-    return null;
-  }, [banner?.image, banner?.mobile_image_url, isMobile]);
-
-  const isVideo = useMemo(() => {
-    if (!mediaUrl) return false;
-    return isVideoUrl(mediaUrl);
-  }, [mediaUrl]);
 
   const words = useMemo(() => {
     if (!banner?.title_line1) return [];
@@ -74,7 +49,7 @@ export default function IntroBanner({ initialBanner = null }: IntroBannerProps) 
     return () => window.clearTimeout(timeout);
   }, [joinedWords, words.length]);
 
-  if (!banner || !mediaUrl) {
+  if (!banner || (!banner.image && !banner.mobile_image_url)) {
     return (
       <section className="relative flex min-h-[70vh] w-full items-center justify-center bg-neutral-900 text-white">
         <div className="text-center space-y-4 px-6">
@@ -93,28 +68,91 @@ export default function IntroBanner({ initialBanner = null }: IntroBannerProps) 
       style={{ padding: animateWords ? "15px" : "0px" }}
     >
       <div className="relative w-full overflow-hidden rounded-[10px]" style={{ height: "calc(100vh - 30px)" }}>
-        {isVideo ? (
-          <video
-            src={mediaUrl}
-            className="w-full object-cover"
-            autoPlay
-            muted
-            loop
-            playsInline
-            style={{ minHeight: "calc(100vh - 30px)" }}
-            preload="auto"
-          />
-        ) : (
-          <Image
-            src={mediaUrl}
-            alt={banner.title_line1 || "Intro banner"}
-            fill
-            priority
-            quality={95}
-            sizes="100vw"
-            style={{ minHeight: "calc(100vh - 30px)" }}
-            className="object-cover"
-          />
+        {/* Desktop Banner */}
+        {banner.image && (
+          <>
+            {isVideoUrl(normalizeImageUrl(banner.image)) ? (
+              <video
+                src={normalizeImageUrl(banner.image)}
+                className="w-full object-cover hidden lg:block"
+                autoPlay
+                muted
+                loop
+                playsInline
+                style={{ minHeight: "calc(100vh - 30px)" }}
+                preload="auto"
+              />
+            ) : (
+              <Image
+                src={normalizeImageUrl(banner.image)}
+                alt={banner.title_line1 || "Intro banner"}
+                fill
+                priority
+                quality={95}
+                sizes="100vw"
+                style={{ minHeight: "calc(100vh - 30px)" }}
+                className="object-cover hidden lg:block"
+              />
+            )}
+          </>
+        )}
+        
+        {/* Mobile Banner */}
+        {banner.mobile_image_url && (
+          <>
+            {isVideoUrl(normalizeImageUrl(banner.mobile_image_url)) ? (
+              <video
+                src={normalizeImageUrl(banner.mobile_image_url)}
+                className="w-full object-cover block lg:hidden"
+                autoPlay
+                muted
+                loop
+                playsInline
+                style={{ minHeight: "calc(100vh - 30px)" }}
+                preload="auto"
+              />
+            ) : (
+              <Image
+                src={normalizeImageUrl(banner.mobile_image_url)}
+                alt={banner.title_line1 || "Intro banner"}
+                fill
+                priority
+                quality={95}
+                sizes="100vw"
+                style={{ minHeight: "calc(100vh - 30px)" }}
+                className="object-cover block lg:hidden"
+              />
+            )}
+          </>
+        )}
+        
+        {/* Fallback: If no mobile image, show desktop on mobile too */}
+        {!banner.mobile_image_url && banner.image && (
+          <>
+            {isVideoUrl(normalizeImageUrl(banner.image)) ? (
+              <video
+                src={normalizeImageUrl(banner.image)}
+                className="w-full object-cover block lg:hidden"
+                autoPlay
+                muted
+                loop
+                playsInline
+                style={{ minHeight: "calc(100vh - 30px)" }}
+                preload="auto"
+              />
+            ) : (
+              <Image
+                src={normalizeImageUrl(banner.image)}
+                alt={banner.title_line1 || "Intro banner"}
+                fill
+                priority
+                quality={95}
+                sizes="100vw"
+                style={{ minHeight: "calc(100vh - 30px)" }}
+                className="object-cover block lg:hidden"
+              />
+            )}
+          </>
         )}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/20 to-black/10" />
 
