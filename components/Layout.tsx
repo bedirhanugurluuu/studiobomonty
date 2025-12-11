@@ -3,7 +3,7 @@ import Header from "./Header";
 import { ReactNode, useEffect } from "react";
 import Footer from "@/components/Footer";
 
-export default function Layout({ children }: { children: ReactNode }) {
+export default function Layout({ children, hideFooter = false }: { children: ReactNode; hideFooter?: boolean }) {
   useEffect(() => {
     // Preload critical pages on mount
     const preloadPages = () => {
@@ -31,7 +31,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     <div className="min-h-screen flex flex-col">
       <Header />
       <main className="flex-1 bg-black z-2 rounded-bl-lg rounded-br-lg">{children}</main>
-      <Footer />
+      {!hideFooter && <Footer />}
     </div>
   );
 }

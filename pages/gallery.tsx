@@ -1,19 +1,12 @@
 "use client";
 
 import { useRef, useState, useEffect, Suspense, useMemo, useCallback } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, useTexture } from "@react-three/drei";
-import { Mesh, LinearFilter } from "three";
-import { normalizeImageUrl } from "@/lib/api";
+import { Mesh, LinearFilter, Raycaster, Vector2 } from "three";
+import { normalizeImageUrl, fetchGalleryItemsSSR, GalleryItem } from "@/lib/api";
 import SEO from "@/components/SEO";
-
-interface GalleryItem {
-  id: string;
-  title: string;
-  subtitle: string;
-  image: string;
-  description?: string;
-}
+import { GetStaticProps } from "next";
 
 interface GalleryProps {
   items?: GalleryItem[];
@@ -23,16 +16,24 @@ interface GalleryProps {
 function ImageSphere({ 
   position, 
   imageUrl, 
-  onClick,
+  item,
   onTextureLoaded
 }: { 
   position: [number, number, number]; 
   imageUrl: string;
-  onClick: () => void;
+  item: GalleryItem;
   onTextureLoaded?: () => void;
 }) {
   const meshRef = useRef<Mesh>(null);
   const texture = useTexture(imageUrl);
+  const [aspectRatio, setAspectRatio] = useState(1); // Default 1:1
+  
+  // Store item reference in mesh for raycasting
+  useEffect(() => {
+    if (meshRef.current) {
+      meshRef.current.userData.galleryItem = item;
+    }
+  }, [item]);
   
   // Optimize texture quality for performance (lower quality for better performance)
   useEffect(() => {
@@ -41,13 +42,23 @@ function ImageSphere({
       texture.magFilter = LinearFilter;
       texture.generateMipmaps = false;
       
-      // Texture yüklendiğinde callback çağır
+      // Texture yüklendiğinde callback çağır ve aspect ratio'yu hesapla
       const image = texture.image as HTMLImageElement;
       if (image) {
+        // Calculate aspect ratio from image dimensions
+        const width = image.width || image.naturalWidth || 1;
+        const height = image.height || image.naturalHeight || 1;
+        const ratio = width / height;
+        setAspectRatio(ratio);
+        
         if (image.complete) {
           onTextureLoaded?.();
         } else {
           image.onload = () => {
+            const imgWidth = image.width || image.naturalWidth || 1;
+            const imgHeight = image.height || image.naturalHeight || 1;
+            const imgRatio = imgWidth / imgHeight;
+            setAspectRatio(imgRatio);
             onTextureLoaded?.();
           };
         }
@@ -62,11 +73,16 @@ function ImageSphere({
     }
   });
 
+  // Calculate plane dimensions based on aspect ratio
+  // Base height is 3, width adjusts based on aspect ratio (increased from 2 for better visibility)
+  const baseSize = 3.5;
+  const planeWidth = baseSize * aspectRatio;
+  const planeHeight = baseSize;
+
   return (
     <mesh
       ref={meshRef}
       position={position}
-      onClick={onClick}
       onPointerOver={(e) => {
         e.stopPropagation();
         if (document.body) {
@@ -79,7 +95,7 @@ function ImageSphere({
         }
       }}
     >
-      <planeGeometry args={[2, 2]} />
+      <planeGeometry args={[planeWidth, planeHeight]} />
       <meshStandardMaterial map={texture} />
     </mesh>
   );
@@ -105,28 +121,144 @@ function Scene({
   onImageClick: (item: GalleryItem) => void;
   onAllTexturesLoaded?: () => void;
 }) {
-  const radius = 8; // Daire yarıçapı
+  const { camera, gl, scene } = useThree();
+  const raycaster = useMemo(() => new Raycaster(), []);
+  const mouse = useMemo(() => new Vector2(), []);
+  const baseRadius = 8; // Temel daire yarıçapı
   const itemsPerCircle = items.length;
   const loadedTexturesRef = useRef(0);
   const totalTexturesRef = useRef(items.length);
+  const [scrollRadius, setScrollRadius] = useState(baseRadius);
+  const scrollYRef = useRef(0);
+  
+  // Handle click with raycasting to find the closest/frontmost image
+  const handleCanvasClick = useCallback((event: MouseEvent) => {
+    const rect = gl.domElement.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    
+    raycaster.setFromCamera(mouse, camera);
+    
+    // Get all meshes with galleryItem userData
+    const meshes: Mesh[] = [];
+    scene.traverse((object) => {
+      if (object instanceof Mesh && object.userData.galleryItem) {
+        meshes.push(object);
+      }
+    });
+    
+    const intersects = raycaster.intersectObjects(meshes);
+    
+    if (intersects.length > 0) {
+      // Get the closest intersection (first one is closest/frontmost)
+      const clickedMesh = intersects[0].object as Mesh;
+      const item = clickedMesh.userData.galleryItem as GalleryItem;
+      if (item) {
+        onImageClick(item);
+      }
+    }
+  }, [camera, gl, mouse, raycaster, scene, onImageClick]);
+  
+  // Add click event listener
+  useEffect(() => {
+    const canvas = gl.domElement;
+    canvas.addEventListener('click', handleCanvasClick);
+    return () => {
+      canvas.removeEventListener('click', handleCanvasClick);
+    };
+  }, [gl.domElement, handleCanvasClick]);
 
-  // Görselleri küre yüzeyinde (spherical coordinates) random yerleştir
+  // Scroll event handler - aşağı scroll = uzaklaş ve x eksenine doğru uzasın
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      
+      // Scroll pozisyonuna göre radius'u hesapla - daha hızlı ve az scroll'da açılsın
+      // Scroll 0 ise baseRadius, scroll arttıkça radius artar
+      const maxScroll = 800; // Maksimum scroll değeri azaltıldı (daha az scroll)
+      const scrollRatio = Math.min(currentScrollY / maxScroll, 1);
+      const newRadius = baseRadius + (scrollRatio * 12); // 8'den 20'ye kadar - hızlı açılma
+      
+      setScrollRadius(newRadius);
+      scrollYRef.current = currentScrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [baseRadius]);
+
+  // Görsellerin açılarını sabit tut (sadece radius değişecek) - uniform küresel dağılım
+  const angles = useMemo(() => {
+    const minDistance = 0.5; // Minimum açısal mesafe (radyan cinsinden) - daha az sıkı
+    const generatedAngles: { theta: number; phi: number }[] = [];
+    
+    // Fisher-Yates shuffle ile görselleri karıştır
+    const shuffledIndices = Array.from({ length: items.length }, (_, i) => i);
+    for (let i = shuffledIndices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledIndices[i], shuffledIndices[j]] = [shuffledIndices[j], shuffledIndices[i]];
+    }
+    
+    for (let i = 0; i < items.length; i++) {
+      let attempts = 0;
+      let validPosition = false;
+      let theta: number, phi: number;
+      
+      // Minimum mesafe kontrolü ile pozisyon bul
+      while (!validPosition && attempts < 200) {
+        // Tamamen random küresel koordinatlar
+        theta = Math.random() * Math.PI * 2; // 0-2π arası random
+        phi = Math.acos(2 * Math.random() - 1); // Uniform küresel dağılım
+        
+        // Diğer görsellerle mesafe kontrolü (3D uzaklık)
+        validPosition = generatedAngles.every((existing) => {
+          // Küresel koordinatlardan 3D mesafe hesapla
+          const x1 = Math.sin(phi) * Math.cos(theta);
+          const y1 = Math.cos(phi);
+          const z1 = Math.sin(phi) * Math.sin(theta);
+          
+          const x2 = Math.sin(existing.phi) * Math.cos(existing.theta);
+          const y2 = Math.cos(existing.phi);
+          const z2 = Math.sin(existing.phi) * Math.sin(existing.theta);
+          
+          const distance = Math.sqrt(
+            Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2) + Math.pow(z1 - z2, 2)
+          );
+          
+          return distance >= minDistance;
+        });
+        
+        attempts++;
+      }
+      
+      // Eğer geçerli pozisyon bulunamazsa, tamamen random bir pozisyon kullan
+      if (!validPosition) {
+        // Tamamen random küresel koordinatlar
+        theta = Math.random() * Math.PI * 2;
+        phi = Math.acos(2 * Math.random() - 1);
+      }
+      
+      generatedAngles.push({ theta: theta!, phi: phi! });
+    }
+    
+    return generatedAngles;
+  }, [items.length, itemsPerCircle]);
+
+  // Scroll'a göre pozisyonları hesapla - x eksenine doğru uzasın
   const positions = useMemo(() => {
-    return items.map((_, index) => {
-      // Spherical coordinates: theta (azimuth) ve phi (polar)
-      // Theta: 0 to 2π (tam daire - sağa sola)
-      // Phi: 0 to π (yukarı aşağı - üstten alta)
-      const theta = (index / itemsPerCircle) * Math.PI * 2; // Azimuth angle
-      const phi = Math.acos(2 * Math.random() - 1); // Polar angle (uniform distribution on sphere)
-      
-      // Spherical to Cartesian conversion
-      const x = radius * Math.sin(phi) * Math.cos(theta);
-      const y = radius * Math.cos(phi);
-      const z = radius * Math.sin(phi) * Math.sin(theta);
-      
+    // Scroll ratio'yu radius'tan hesapla (baseRadius=8, max=20, scrollRatio = (scrollRadius-8)/12)
+    const scrollRatio = Math.max(0, Math.min(1, (scrollRadius - baseRadius) / 12));
+    
+    // X eksenini daha fazla uzat (elipsoid efekti)
+    const xScale = 1 + (scrollRatio * 1.5); // 1'den 2.5'e kadar
+    
+    return angles.map(({ theta, phi }) => {
+      const x = scrollRadius * Math.sin(phi) * Math.cos(theta) * xScale;
+      const y = scrollRadius * Math.cos(phi);
+      const z = scrollRadius * Math.sin(phi) * Math.sin(theta);
       return [x, y, z] as [number, number, number];
     });
-  }, [items.length, itemsPerCircle, radius]);
+  }, [angles, scrollRadius, baseRadius]);
 
   const handleTextureLoaded = useCallback(() => {
     loadedTexturesRef.current += 1;
@@ -152,19 +284,17 @@ function Scene({
           <ImageSphere
             position={positions[index]}
             imageUrl={normalizeImageUrl(item.image)}
-            onClick={() => onImageClick(item)}
+            item={item}
             onTextureLoaded={handleTextureLoaded}
           />
         </Suspense>
       ))}
       
       <OrbitControls
-        enableZoom={true}
+        enableZoom={false}
         enablePan={false}
-        minDistance={5}
-        maxDistance={20}
-        autoRotate={false}
-        autoRotateSpeed={0.5}
+        autoRotate={true}
+        autoRotateSpeed={0.3}
       />
     </>
   );
@@ -289,6 +419,20 @@ function ImageModal({
   isOpen: boolean; 
   onClose: () => void;
 }) {
+  // ESC key handler
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose]);
+
   if (!isOpen || !item) return null;
 
   return (
@@ -297,12 +441,12 @@ function ImageModal({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-6xl mx-4 bg-black border border-white/20 rounded-lg overflow-hidden"
+        className="relative w-full max-w-5xl mx-4 bg-black border border-white/20 overflow-hidden max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 text-white hover:text-gray-300 transition-colors"
+          className="absolute top-4 right-4 z-10 text-white hover:text-gray-300 transition-colors bg-black/50 cursor-pointer p-2"
         >
           <svg
             className="w-6 h-6"
@@ -319,26 +463,21 @@ function ImageModal({
           </svg>
         </button>
 
-        <div className="grid md:grid-cols-2 gap-0">
-          {/* Sol: Görsel */}
-          <div className="relative aspect-square md:aspect-auto md:h-[600px]">
+        <div className="flex flex-col">
+          {/* Üst: Görsel - Daha büyük */}
+          <div className="w-full relative flex-shrink-0">
             <img
               src={normalizeImageUrl(item.image)}
               alt={item.title}
-              className="w-full h-full object-cover"
+              className="w-full h-auto max-h-[60vh] object-contain"
             />
           </div>
 
-          {/* Sağ: Yazılar */}
-          <div className="p-8 md:p-12 flex flex-col justify-center text-white">
-            <h2 className="text-3xl md:text-4xl font-medium uppercase mb-4">
+          {/* Alt: Yazılar */}
+          <div className="p-6 md:p-8 flex flex-col text-white flex-shrink-0">
+            <h2 className="text-2xl md:text-3xl font-medium uppercase mb-3">
               {item.title}
             </h2>
-            {item.subtitle && (
-              <p className="text-lg md:text-xl text-white/70 mb-6 uppercase tracking-wider">
-                {item.subtitle}
-              </p>
-            )}
             {item.description && (
               <p className="text-base md:text-lg text-white/60 leading-relaxed">
                 {item.description}
@@ -357,798 +496,12 @@ export default function GalleryPage({ items: initialItems = [] }: GalleryProps) 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Static images from internet
+  // Use items from props (fetched via getStaticProps)
   useEffect(() => {
-    if (items.length === 0) {
-      const staticImages: GalleryItem[] = [
-        {
-          id: "1",
-          title: "Creative Design",
-          subtitle: "Brand Identity",
-          image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=300&h=300&fit=crop&q=60",
-          description: "A modern approach to brand identity design that captures the essence of contemporary aesthetics."
-        },
-        {
-          id: "2",
-          title: "Digital Experience",
-          subtitle: "User Interface",
-          image: "https://images.unsplash.com/photo-1558655146-d09347e92766?w=300&h=300&fit=crop&q=60",
-          description: "Creating intuitive and beautiful user interfaces that enhance digital experiences."
-        },
-        {
-          id: "3",
-          title: "Visual Storytelling",
-          subtitle: "Photography",
-          image: "https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=300&h=300&fit=crop&q=60",
-          description: "Capturing moments and stories through the lens of creative photography."
-        },
-        {
-          id: "4",
-          title: "Motion Graphics",
-          subtitle: "Animation",
-          image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300&h=300&fit=crop&q=60",
-          description: "Bringing static designs to life with smooth and engaging animations."
-        },
-        {
-          id: "5",
-          title: "Architectural Vision",
-          subtitle: "3D Rendering",
-          image: "https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=300&h=300&fit=crop&q=60",
-          description: "Visualizing architectural concepts through detailed 3D renderings."
-        },
-        {
-          id: "6",
-          title: "Product Design",
-          subtitle: "Industrial",
-          image: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=300&h=300&fit=crop&q=60",
-          description: "Designing products that combine functionality with aesthetic appeal."
-        },
-        {
-          id: "7",
-          title: "Fashion Editorial",
-          subtitle: "Styling",
-          image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=300&h=300&fit=crop&q=60",
-          description: "Curating fashion stories that express unique style and vision."
-        },
-        {
-          id: "8",
-          title: "Art Direction",
-          subtitle: "Creative",
-          image: "https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=300&h=300&fit=crop&q=60",
-          description: "Directing creative projects with a focus on visual storytelling."
-        },
-        {
-          id: "9",
-          title: "Web Design",
-          subtitle: "Digital",
-          image: "https://images.unsplash.com/photo-1467232004584-a241de8bcf5d?w=300&h=300&fit=crop&q=60",
-          description: "Crafting responsive and engaging web experiences."
-        },
-        {
-          id: "10",
-          title: "Brand Campaign",
-          subtitle: "Marketing",
-          image: "https://images.unsplash.com/photo-1558655146-9f40138edfeb?w=300&h=300&fit=crop&q=60",
-          description: "Developing comprehensive brand campaigns that resonate with audiences."
-        },
-        {
-          id: "11",
-          title: "Editorial Design",
-          subtitle: "Print",
-          image: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=300&h=300&fit=crop&q=60",
-          description: "Designing print materials that communicate effectively and beautifully."
-        },
-        {
-          id: "12",
-          title: "Packaging Design",
-          subtitle: "Product",
-          image: "https://images.unsplash.com/photo-1607082349566-187342175e2f?w=300&h=300&fit=crop&q=60",
-          description: "Creating packaging that stands out on shelves and tells a brand story."
-        },
-        {
-          id: "13",
-          title: "Event Design",
-          subtitle: "Experience",
-          image: "https://images.unsplash.com/photo-1511578314322-379afb476865?w=300&h=300&fit=crop&q=60",
-          description: "Designing memorable event experiences that leave lasting impressions."
-        },
-        {
-          id: "14",
-          title: "Typography",
-          subtitle: "Lettering",
-          image: "https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=300&h=300&fit=crop&q=60",
-          description: "Exploring the art of typography and custom lettering."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "16",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "17",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-        {
-          id: "15",
-          title: "Concept Art",
-          subtitle: "Illustration",
-          image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300&h=300&fit=crop&q=60",
-          description: "Creating conceptual illustrations that bring ideas to visual life."
-        },
-      ];
-      setItems(staticImages);
+    if (initialItems.length > 0) {
+      setItems(initialItems);
     }
-  }, [items.length]);
+  }, [initialItems]);
 
   // Tüm texture'lar yüklendiğinde çağrılır
   const handleAllTexturesLoaded = useCallback(() => {
@@ -1175,15 +528,15 @@ export default function GalleryPage({ items: initialItems = [] }: GalleryProps) 
         description="Explore our creative work in an immersive 3D gallery experience"
         image="https://studiobomonty.vercel.app/images/og-image.jpg"
       />
-      <div className="min-h-screen bg-black">
+      <div className="bg-black" style={{ minHeight: '150vh' }}>
         {isLoading && <GalleryLoader />}
-        <div className={`h-screen w-full ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-500`}>
+        <div className={`fixed inset-0 w-full h-full ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-500`}>
           <Suspense fallback={
             <div className="h-full w-full flex items-center justify-center text-white">
               <p>Loading gallery...</p>
             </div>
           }>
-            <Canvas camera={{ position: [0, 0, 15], fov: 75 }}>
+            <Canvas camera={{ position: [0, 0, 20], fov: 75 }}>
               <Scene 
                 items={items} 
                 onImageClick={handleImageClick}
@@ -1191,11 +544,6 @@ export default function GalleryPage({ items: initialItems = [] }: GalleryProps) 
               />
             </Canvas>
           </Suspense>
-        </div>
-
-        {/* Instructions */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 text-white/60 text-sm text-center z-10">
-          <p>Drag to rotate • Click on images to view details</p>
         </div>
 
         <ImageModal
@@ -1207,3 +555,29 @@ export default function GalleryPage({ items: initialItems = [] }: GalleryProps) 
     </>
   );
 }
+
+export const getStaticProps: GetStaticProps = async () => {
+  try {
+    const items = await fetchGalleryItemsSSR();
+    
+    return {
+      props: {
+        items: items.map(item => ({
+          id: item.id,
+          title: item.title,
+          image: normalizeImageUrl(item.image),
+          description: item.description || ''
+        }))
+      },
+      revalidate: 60 // 1 dakikada bir yenile
+    };
+  } catch (error) {
+    console.error('Gallery static props error:', error);
+    return {
+      props: {
+        items: []
+      },
+      revalidate: 60
+    };
+  }
+};

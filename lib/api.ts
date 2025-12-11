@@ -651,3 +651,24 @@ export async function fetchNewsBySlugSSR(slug: string): Promise<News | null> {
 export async function fetchNewsSSR(): Promise<News[]> {
   return fetchNews();
 }
+
+// Gallery Items
+export interface GalleryItem {
+  id: string;
+  image: string;
+  title: string;
+  description?: string;
+  display_order?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function fetchGalleryItemsSSR(): Promise<GalleryItem[]> {
+  const { data, error } = await supabase
+    .from('gallery_items')
+    .select('*')
+    .order('display_order', { ascending: true })
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}

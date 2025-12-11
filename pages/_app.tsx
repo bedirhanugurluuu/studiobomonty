@@ -87,9 +87,12 @@ export default function App({ Component, pageProps }: AppProps) {
     );
   }
 
+  // Gallery sayfası için Layout kullan ama footer'ı gizle
+  const isGalleryPage = typeof window !== 'undefined' && window.location.pathname === '/gallery';
+
   return (
     <div className={GeistSans.className}>
-      <Layout>
+      <Layout hideFooter={isGalleryPage}>
         <Component {...pageProps} />
       </Layout>
     </div>
