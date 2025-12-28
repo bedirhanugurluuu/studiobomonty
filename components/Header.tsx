@@ -8,16 +8,22 @@ import { useHeaderSettings } from "../hooks/useHeaderSettings";
 import Image from "next/image";
 
 export default function Header() {
+  const [mounted, setMounted] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [istanbulTime, setIstanbulTime] = useState("");
-  const { settings: headerSettings } = useHeaderSettings();
+  const { settings: headerSettings, loading: headerLoading } = useHeaderSettings();
   const pathname = usePathname();
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dropdownContentRef = useRef<HTMLDivElement | null>(null);
   const [menuHeight, setMenuHeight] = useState(0);
   const CLOSE_DELAY = 220;
   const BASE_CONTAINER_HEIGHT = 112;
+
+  // Client-side mount kontrolü - hydration hatasını önlemek için
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -51,21 +57,17 @@ export default function Header() {
     forceBlackTextPages.includes(pathname) || pathname.startsWith("/blog/") :
     false;
 
-  // Varsayılan menü öğeleri (fallback)
-  const defaultNavItems = [
-    { href: "/projects", label: "PROJECTS" },
-    { href: "/about", label: "ABOUT" },
-    { href: "/blog", label: "JOURNAL" },
-    { href: "/contact", label: "CONTACT" },
-  ];
-
-  // Her zaman menü öğelerini göster - loading olsa bile varsayılan öğeleri kullan
+  // Menü öğelerini sadece DB'den veri geldiğinde göster
   const navItems = useMemo(() => {
+    // Loading durumunda veya settings null ise boş döndür
+    if (headerLoading || !headerSettings) {
+      return [];
+    }
     if (headerSettings?.menu_items && headerSettings.menu_items.length > 0) {
       return [...headerSettings.menu_items].sort((a: any, b: any) => a.order - b.order);
     }
-    return defaultNavItems;
-  }, [headerSettings?.menu_items]);
+    return [];
+  }, [headerSettings?.menu_items, headerLoading, headerSettings]);
 
   const primaryNavItems = navItems.slice(0, 3);
   const activeBackground = scrolled || menuOpen || isDarkText;
@@ -181,28 +183,26 @@ export default function Header() {
             */}
           </Link>
 
-          {primaryNavItems.length > 0 && (
-            <nav
-              className={clsx(
-                "hidden md:flex items-center gap-6 text-sm font-medium uppercase transition-opacity duration-300",
-                menuOpen && "opacity-0 pointer-events-none"
-              )}
-            >
-              {primaryNavItems.map((item: any) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="group relative block"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  <span className="relative inline-block text-white transition-transform duration-300 uppercase">
-                    {item.label.toUpperCase()}
-                    <span className="absolute left-0 bottom-0 h-[1px] w-full origin-left scale-x-0 bg-white transition-transform duration-300 ease-out group-hover:scale-x-100" />
-                  </span>
-                </Link>
-              ))}
-            </nav>
-          )}
+          <nav
+            className={clsx(
+              "hidden md:flex items-center gap-6 text-sm font-medium uppercase transition-opacity duration-300",
+              menuOpen && "opacity-0 pointer-events-none"
+            )}
+          >
+            {mounted && primaryNavItems.length > 0 && primaryNavItems.map((item: any) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="group relative block"
+                onClick={() => setMenuOpen(false)}
+              >
+                <span className="relative inline-block text-white transition-transform duration-300 uppercase">
+                  {item.label.toUpperCase()}
+                  <span className="absolute left-0 bottom-0 h-[1px] w-full origin-left scale-x-0 bg-white transition-transform duration-300 ease-out group-hover:scale-x-100" />
+                </span>
+              </Link>
+            ))}
+          </nav>
 
           <div className="relative flex items-center cursor-pointer">
             <button
@@ -247,7 +247,7 @@ export default function Header() {
             ref={dropdownContentRef}
             className="grid gap-6 md:gap-12 pt-4 pb-4 text-xs uppercase md:grid-cols-2"
           >
-            {navItems.length > 0 && (
+            {navItems.length > 0 && mounted ? (
               <nav className="flex flex-col gap-1 text-sm font-medium md:col-span-2">
                 {navItems.map((item: any, index: number) => (
                   <div key={item.href} className="overflow-hidden">
@@ -274,9 +274,9 @@ export default function Header() {
                   </div>
                 ))}
               </nav>
-            )}
+            ) : null}
 
-            {headerSettings?.social_items && headerSettings.social_items.length > 0 && (
+            {headerSettings?.social_items && headerSettings.social_items.length > 0 && mounted ? (
               <div className="flex gap-2 text-white items-end">
                 {headerSettings.social_items
                   .sort((a: any, b: any) => a.order - b.order)
@@ -299,20 +299,22 @@ export default function Header() {
                     </div>
                   ))}
               </div>
-            )}
+            ) : null}
             <div className="flex flex-col items-start justify-end gap-1 md:items-end">
               <div className="overflow-hidden">
-                <span
-                  className="block text-sm font-medium tracking-[0.35em] text-white"
-                  style={{
-                    transform: menuOpen ? "translateY(0%)" : "translateY(100%)",
-                    opacity: menuOpen ? .4 : 0,
-                    transition: "transform 0.8s ease-out, opacity 0.8s ease-out",
-                    transitionDelay: menuOpen ? "0.35s" : "0s",
-                  }}
-                >
-                  {istanbulTime}
-                </span>
+                {mounted ? (
+                  <span
+                    className="block text-sm font-medium tracking-[0.35em] text-white"
+                    style={{
+                      transform: menuOpen ? "translateY(0%)" : "translateY(100%)",
+                      opacity: menuOpen ? .4 : 0,
+                      transition: "transform 0.8s ease-out, opacity 0.8s ease-out",
+                      transitionDelay: menuOpen ? "0.35s" : "0s",
+                    }}
+                  >
+                    {istanbulTime}
+                  </span>
+                ) : null}
               </div>
             </div>
           </div>

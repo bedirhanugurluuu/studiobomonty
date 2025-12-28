@@ -86,15 +86,46 @@ const FeaturedProjects = ({ initialProjects = [] }: FeaturedProjectsProps) => {
 		});
 	}, [projects]);
 
-	// Preload all images when component mounts and preload next image when activeIndex changes
+	// Section görünür olduğunda tüm görselleri yükle
+	const [sectionVisible, setSectionVisible] = useState(false);
+	const [imagesLoaded, setImagesLoaded] = useState(false);
+
 	useEffect(() => {
-		if (typeof window === 'undefined') return;
+		if (projects.length === 0 || !sectionRef.current) return;
+
+		const sectionObserver = new IntersectionObserver(
+			(entries) => {
+				const entry = entries[0];
+				if (entry.isIntersecting && !sectionVisible) {
+					setSectionVisible(true);
+				}
+			},
+			{
+				threshold: 0.1,
+				rootMargin: '200px 0px', // Section'a 200px kala yüklemeye başla
+			}
+		);
+
+		sectionObserver.observe(sectionRef.current);
+
+		return () => {
+			if (sectionRef.current) {
+				sectionObserver.unobserve(sectionRef.current);
+			}
+		};
+	}, [projects.length, sectionVisible]);
+
+	// Section görünür olduğunda tüm görselleri yükle
+	useEffect(() => {
+		if (!sectionVisible || imagesLoaded || typeof window === 'undefined' || projectMedia.length === 0) return;
 		
 		const links: HTMLLinkElement[] = [];
+		const imagePromises: Promise<void>[] = [];
 		
-		// Preload all images
+		// Tüm görselleri yükle
 		projectMedia.forEach((media) => {
 			if (!media.isVideo && media.url) {
+				// Preload link ekle
 				const link = document.createElement('link');
 				link.rel = 'preload';
 				link.as = 'image';
@@ -102,20 +133,22 @@ const FeaturedProjects = ({ initialProjects = [] }: FeaturedProjectsProps) => {
 				link.fetchPriority = 'high';
 				document.head.appendChild(link);
 				links.push(link);
+
+				// Görseli gerçekten yükle
+				const img = document.createElement('img');
+				const promise = new Promise<void>((resolve) => {
+					img.onload = () => resolve();
+					img.onerror = () => resolve(); // Hata olsa bile devam et
+					img.src = media.url;
+				});
+				imagePromises.push(promise);
 			}
 		});
 
-		// Preload next image proactively
-		const nextIndex = activeIndex + 1;
-		if (nextIndex < projectMedia.length && !projectMedia[nextIndex].isVideo && projectMedia[nextIndex].url) {
-			const nextLink = document.createElement('link');
-			nextLink.rel = 'preload';
-			nextLink.as = 'image';
-			nextLink.href = projectMedia[nextIndex].url;
-			nextLink.fetchPriority = 'high';
-			document.head.appendChild(nextLink);
-			links.push(nextLink);
-		}
+		// Tüm görseller yüklendiğinde işaretle
+		Promise.all(imagePromises).then(() => {
+			setImagesLoaded(true);
+		});
 
 		return () => {
 			links.forEach((link) => {
@@ -124,7 +157,7 @@ const FeaturedProjects = ({ initialProjects = [] }: FeaturedProjectsProps) => {
 				}
 			});
 		};
-	}, [projectMedia, activeIndex]);
+	}, [sectionVisible, projectMedia]);
 
 	// Section and text container refs for height calculation (mobile only)
 	const sectionRef = useRef<HTMLElement>(null);
@@ -286,18 +319,18 @@ const FeaturedProjects = ({ initialProjects = [] }: FeaturedProjectsProps) => {
 													className="h-full w-full object-cover"
 												/>
 											) : (
-												<Image
-													key={`mobile-image-${activeIndex}`}
-													src={projectMedia[activeIndex].url}
-													alt={projectMedia[activeIndex].title}
-													width={1200}
-													height={800}
-													quality={95}
-													sizes="(max-width: 768px) 100vw, 50vw"
-													className="h-full w-full object-cover"
-													priority={true}
-													loading="eager"
-												/>
+											<Image
+												key={`mobile-image-${activeIndex}`}
+												src={projectMedia[activeIndex].url}
+												alt={projectMedia[activeIndex].title}
+												width={1200}
+												height={800}
+												quality={95}
+												sizes="(max-width: 768px) 100vw, 50vw"
+												className="h-full w-full object-cover"
+												priority={sectionVisible}
+												loading={sectionVisible ? "eager" : "lazy"}
+											/>
 											)}
 										</>
 									)}
@@ -329,8 +362,8 @@ const FeaturedProjects = ({ initialProjects = [] }: FeaturedProjectsProps) => {
 												quality={95}
 												sizes="(max-width: 768px) 100vw, 50vw"
 												className="h-full w-full object-cover"
-												priority={true}
-												loading="eager"
+												priority={sectionVisible}
+												loading={sectionVisible ? "eager" : "lazy"}
 											/>
 										)}
 									</>

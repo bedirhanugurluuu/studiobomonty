@@ -7,6 +7,7 @@ export interface Project {
   subtitle: string;
   description: string;
   banner_media?: string;
+  mobile_image_url?: string;
   video_url?: string;
   is_featured: boolean;
   featured_order?: number;
@@ -14,7 +15,8 @@ export interface Project {
   client_name?: string;
   tab1?: string;
   tab2?: string;
-  project_tab_id?: string;
+  project_tab_id?: string; // Eski sistem için (deprecated)
+  project_tab_ids?: string[]; // Yeni çoklu kategori sistemi
   external_link?: string;
   slug: string;
   created_at: string;
@@ -247,7 +249,23 @@ export async function fetchProjects(): Promise<Project[]> {
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return data || [];
+  
+  // Her proje için kategorileri çek
+  const projectsWithTabs = await Promise.all(
+    (data || []).map(async (project) => {
+      const { data: tabsData } = await supabase
+        .from('project_project_tabs')
+        .select('project_tab_id')
+        .eq('project_id', project.id);
+      
+      return {
+        ...project,
+        project_tab_ids: tabsData?.map(t => t.project_tab_id) || []
+      };
+    })
+  );
+  
+  return projectsWithTabs;
 }
 
 export async function fetchProjectsSSR(): Promise<Project[]> {
@@ -284,7 +302,23 @@ export async function fetchFeaturedProjects(): Promise<Project[]> {
     .order('featured_order', { ascending: true });
 
   if (error) throw error;
-  return data || [];
+  
+  // Her proje için kategorileri çek
+  const projectsWithTabs = await Promise.all(
+    (data || []).map(async (project) => {
+      const { data: tabsData } = await supabase
+        .from('project_project_tabs')
+        .select('project_tab_id')
+        .eq('project_id', project.id);
+      
+      return {
+        ...project,
+        project_tab_ids: tabsData?.map(t => t.project_tab_id) || []
+      };
+    })
+  );
+  
+  return projectsWithTabs;
 }
 
 export async function fetchProjectBySlug(slug: string): Promise<Project | null> {
@@ -298,7 +332,18 @@ export async function fetchProjectBySlug(slug: string): Promise<Project | null> 
     .single();
 
   if (error) throw error;
-  return data as Project;
+  if (!data) return null;
+
+  // Kategorileri çek
+  const { data: tabsData } = await supabase
+    .from('project_project_tabs')
+    .select('project_tab_id')
+    .eq('project_id', data.id);
+
+  return {
+    ...data,
+    project_tab_ids: tabsData?.map(t => t.project_tab_id) || []
+  } as Project;
 }
 
 export async function fetchProjectGallery(projectId: string): Promise<string[]> {

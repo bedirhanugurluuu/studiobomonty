@@ -35,11 +35,16 @@ export default function IntroBanner({ initialBanner = null }: IntroBannerProps) 
       .filter(Boolean);
   }, [banner?.title_line1]);
 
+  const [mounted, setMounted] = useState(false);
   const [animateWords, setAnimateWords] = useState(false);
   const joinedWords = useMemo(() => words.join(" "), [words]);
 
   useEffect(() => {
-    if (!words.length) {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted || !words.length) {
       setAnimateWords(false);
       return;
     }
@@ -47,7 +52,7 @@ export default function IntroBanner({ initialBanner = null }: IntroBannerProps) 
     setAnimateWords(false);
     const timeout = window.setTimeout(() => setAnimateWords(true), 60);
     return () => window.clearTimeout(timeout);
-  }, [joinedWords, words.length]);
+  }, [mounted, joinedWords, words.length]);
 
   if (!banner || (!banner.image && !banner.mobile_image_url)) {
     return (

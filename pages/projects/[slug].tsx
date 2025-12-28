@@ -243,7 +243,6 @@ export default function ProjectDetail({ project, moreProjects, galleryImages, te
                        >
                          VIEW LIVE SITE
                          <ButtonWithHoverArrow />
-                         <span className="absolute bottom-0 left-0 h-[1px] bg-white w-full origin-left transition-transform duration-300 ease-out group-hover:scale-x-0" />
                        </Link>
                      </div>
                    )}

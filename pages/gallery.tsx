@@ -131,8 +131,45 @@ function Scene({
   const [scrollRadius, setScrollRadius] = useState(baseRadius);
   const scrollYRef = useRef(0);
   
+  // Drag durumunu takip et
+  const isDraggingRef = useRef(false);
+  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const dragThreshold = 5; // 5 pikselden fazla hareket = drag
+  
+  // Mouse down - drag başlangıcı
+  const handleMouseDown = useCallback((event: MouseEvent) => {
+    dragStartPosRef.current = { x: event.clientX, y: event.clientY };
+    isDraggingRef.current = false;
+  }, []);
+  
+  // Mouse move - drag kontrolü
+  const handleMouseMove = useCallback((event: MouseEvent) => {
+    if (dragStartPosRef.current) {
+      const dx = Math.abs(event.clientX - dragStartPosRef.current.x);
+      const dy = Math.abs(event.clientY - dragStartPosRef.current.y);
+      
+      if (dx > dragThreshold || dy > dragThreshold) {
+        isDraggingRef.current = true;
+      }
+    }
+  }, []);
+  
+  // Mouse up - drag bitti
+  const handleMouseUp = useCallback(() => {
+    dragStartPosRef.current = null;
+    // Kısa bir delay sonra reset et (click event'inden önce)
+    setTimeout(() => {
+      isDraggingRef.current = false;
+    }, 100);
+  }, []);
+  
   // Handle click with raycasting to find the closest/frontmost image
   const handleCanvasClick = useCallback((event: MouseEvent) => {
+    // Eğer drag yapıldıysa click'i ignore et
+    if (isDraggingRef.current) {
+      return;
+    }
+    
     const rect = gl.domElement.getBoundingClientRect();
     mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -159,14 +196,20 @@ function Scene({
     }
   }, [camera, gl, mouse, raycaster, scene, onImageClick]);
   
-  // Add click event listener
+  // Add event listeners
   useEffect(() => {
     const canvas = gl.domElement;
+    canvas.addEventListener('mousedown', handleMouseDown);
+    canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('mouseup', handleMouseUp);
     canvas.addEventListener('click', handleCanvasClick);
     return () => {
+      canvas.removeEventListener('mousedown', handleMouseDown);
+      canvas.removeEventListener('mousemove', handleMouseMove);
+      canvas.removeEventListener('mouseup', handleMouseUp);
       canvas.removeEventListener('click', handleCanvasClick);
     };
-  }, [gl.domElement, handleCanvasClick]);
+  }, [gl.domElement, handleMouseDown, handleMouseMove, handleMouseUp, handleCanvasClick]);
 
   // Scroll event handler - aşağı scroll = uzaklaş ve x eksenine doğru uzasın
   useEffect(() => {
@@ -419,6 +462,9 @@ function ImageModal({
   isOpen: boolean; 
   onClose: () => void;
 }) {
+  const [imageWidth, setImageWidth] = useState<number | null>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
+
   // ESC key handler
   useEffect(() => {
     if (!isOpen) return;
@@ -433,15 +479,31 @@ function ImageModal({
     return () => window.removeEventListener('keydown', handleEscape);
   }, [isOpen, onClose]);
 
+  // Görsel yüklendiğinde genişliğini al
+  useEffect(() => {
+    if (isOpen && item && imageRef.current) {
+      const img = imageRef.current;
+      if (img.complete) {
+        setImageWidth(img.naturalWidth);
+      } else {
+        img.onload = () => {
+          setImageWidth(img.naturalWidth);
+        };
+      }
+    } else {
+      setImageWidth(null);
+    }
+  }, [isOpen, item]);
+
   if (!isOpen || !item) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      className="fixed top-0 left-0 right-0 bottom-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-5xl mx-4 bg-black border border-white/20 overflow-hidden max-h-[90vh] flex flex-col"
+        className="relative bg-black border border-white/20 overflow-hidden max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -464,9 +526,10 @@ function ImageModal({
         </button>
 
         <div className="flex flex-col">
-          {/* Üst: Görsel - Daha büyük */}
+          {/* Üst: Görsel - Görsel genişliğine göre */}
           <div className="w-full relative flex-shrink-0">
             <img
+              ref={imageRef}
               src={normalizeImageUrl(item.image)}
               alt={item.title}
               className="w-full h-auto max-h-[60vh] object-contain"

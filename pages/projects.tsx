@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { fetchProjectsSSR, fetchProjectTabsSSR, normalizeImageUrl, ProjectTab } from "@/lib/api";
@@ -22,7 +22,8 @@ interface Project {
   display_order?: number; // Proje sıralaması için
   tab1?: string;
   tab2?: string;
-  project_tab_id?: string;
+  project_tab_id?: string; // Eski sistem için (deprecated)
+  project_tab_ids?: string[]; // Yeni çoklu kategori sistemi
   created_at: string;
   updated_at: string;
 }
@@ -36,9 +37,12 @@ export default function ProjectsPage({ projects: initialProjects, tabs: initialT
   const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
   const [tabs, setTabs] = useState<ProjectTab[]>(initialTabs);
   
-  // Filter projects based on selected tab
+  // Filter projects based on selected tab (çoklu kategori desteği)
   const filteredProjects = selectedTabId
-    ? initialProjects.filter(project => project.project_tab_id === selectedTabId)
+    ? initialProjects.filter(project => 
+        project.project_tab_ids?.includes(selectedTabId) || 
+        project.project_tab_id === selectedTabId // Eski sistem desteği
+      )
     : initialProjects;
   const normalizeMedia = (path: string) => {
     if (!path) return { type: "unknown", url: "" };
@@ -107,7 +111,9 @@ export default function ProjectsPage({ projects: initialProjects, tabs: initialT
                 All
               </button>
               {tabs.map((tab) => {
-                const tabProjectsCount = initialProjects.filter(p => p.project_tab_id === tab.id).length;
+                const tabProjectsCount = initialProjects.filter(p => 
+                  p.project_tab_ids?.includes(tab.id) || p.project_tab_id === tab.id
+                ).length;
                 if (tabProjectsCount === 0) return null;
                 
                 return (
@@ -130,19 +136,33 @@ export default function ProjectsPage({ projects: initialProjects, tabs: initialT
       </div>
 
       {/* GRID VIEW */}
-      <motion.div layout className="grid lg:grid-cols-3 md:grid-cols-2 sm:grid-cols-1 gap-5">
-          {filteredProjects.length > 0 ? (
-            filteredProjects.map((project, i) => {
-            const media = normalizeMedia(project.banner_media || "");
+      <div className="grid lg:grid-cols-3 md:grid-cols-2 sm:grid-cols-1 gap-5">
+          <AnimatePresence mode="popLayout">
+            {filteredProjects.length > 0 ? (
+              filteredProjects.map((project, i) => {
+              const media = normalizeMedia(project.banner_media || "");
 
-            return (
-              <Link key={project.id} href={`/projects/${project.slug}`} passHref >
+              return (
                 <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
+                  key={project.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.9, y: 30 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ 
+                    opacity: 0, 
+                    scale: 0.9, 
+                    y: -30,
+                    transition: { duration: 0.3 }
+                  }}
+                  transition={{ 
+                    duration: 0.5,
+                    delay: i * 0.04,
+                    ease: [0.4, 0, 0.2, 1],
+                    layout: { duration: 0.5, ease: [0.4, 0, 0.2, 1] }
+                  }}
                   className="group cursor-pointer"
                 >
+                <Link href={`/projects/${project.slug}`} passHref>
                   {/* Image Container */}
                   <div className="relative overflow-hidden rounded-[10px] mb-4" style={{ aspectRatio: 2000 / 1333 }}>
                     {media.type === "video" ? (
@@ -204,16 +224,24 @@ export default function ProjectsPage({ projects: initialProjects, tabs: initialT
                       {project.subtitle}
                     </p>
                   </div>
+                </Link>
                 </motion.div>
-              </Link>
-            );
-          })
-          ) : (
-            <div className="col-span-full text-center py-20">
-              <p className="text-white/50 text-lg">Bu kategoride proje bulunmuyor.</p>
-            </div>
-          )}
-      </motion.div>
+              );
+            })
+            ) : (
+              <motion.div
+                key="no-projects"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.4 }}
+                className="col-span-full text-center py-20"
+              >
+                <p className="text-white/50 text-lg">Bu kategoride proje bulunmuyor.</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+      </div>
       </div>
     </>
   );

@@ -81,8 +81,14 @@ export default function AnimatedAbout({ initialContent, initialProjects = [], in
     };
   }, []);
 
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
-    if (!heroWords.length) {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted || !heroWords.length) {
       setAnimateWords(false);
       return;
     }
@@ -90,7 +96,7 @@ export default function AnimatedAbout({ initialContent, initialProjects = [], in
     setAnimateWords(false);
     const timeout = window.setTimeout(() => setAnimateWords(true), 60);
     return () => window.clearTimeout(timeout);
-  }, [joinedHeroWords, heroWords.length]);
+  }, [mounted, joinedHeroWords, heroWords.length]);
 
   // Projects'i fetch et (sadece initialProjects boşsa)
   useEffect(() => {
@@ -927,15 +933,46 @@ const ServicesSection = ({ initialServices = [] }: ServicesSectionProps) => {
     });
   }, [services]);
 
-  // Preload all service images when component mounts and preload next image when activeIndex changes
+  // Section görünür olduğunda tüm görselleri yükle
+  const [sectionVisible, setSectionVisible] = useState(false);
+  const [imagesLoaded, setImagesLoaded] = useState(false);
+
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (services.length === 0 || !sectionRef.current) return;
+
+    const sectionObserver = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry.isIntersecting && !sectionVisible) {
+          setSectionVisible(true);
+        }
+      },
+      {
+        threshold: 0.1,
+        rootMargin: '200px 0px', // Section'a 200px kala yüklemeye başla
+      }
+    );
+
+    sectionObserver.observe(sectionRef.current);
+
+    return () => {
+      if (sectionRef.current) {
+        sectionObserver.unobserve(sectionRef.current);
+      }
+    };
+  }, [services.length, sectionVisible]);
+
+  // Section görünür olduğunda tüm görselleri yükle
+  useEffect(() => {
+    if (!sectionVisible || imagesLoaded || typeof window === 'undefined' || serviceMedia.length === 0) return;
     
     const links: HTMLLinkElement[] = [];
+    const imagePromises: Promise<void>[] = [];
     
-    // Preload all images
+    // Tüm görselleri yükle
     serviceMedia.forEach((media) => {
       if (!media.isVideo && media.url) {
+        // Preload link ekle
         const link = document.createElement('link');
         link.rel = 'preload';
         link.as = 'image';
@@ -943,22 +980,22 @@ const ServicesSection = ({ initialServices = [] }: ServicesSectionProps) => {
         (link as any).fetchPriority = 'high';
         document.head.appendChild(link);
         links.push(link);
+
+        // Görseli gerçekten yükle
+        const img = document.createElement('img');
+        const promise = new Promise<void>((resolve) => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve(); // Hata olsa bile devam et
+          img.src = media.url;
+        });
+        imagePromises.push(promise);
       }
     });
 
-    // Preload next image proactively
-    if (activeIndex !== null) {
-      const nextIndex = activeIndex + 1;
-      if (nextIndex < serviceMedia.length && !serviceMedia[nextIndex].isVideo && serviceMedia[nextIndex].url) {
-        const nextLink = document.createElement('link');
-        nextLink.rel = 'preload';
-        nextLink.as = 'image';
-        nextLink.href = serviceMedia[nextIndex].url;
-        (nextLink as any).fetchPriority = 'high';
-        document.head.appendChild(nextLink);
-        links.push(nextLink);
-      }
-    }
+    // Tüm görseller yüklendiğinde işaretle
+    Promise.all(imagePromises).then(() => {
+      setImagesLoaded(true);
+    });
 
     return () => {
       links.forEach((link) => {
@@ -967,7 +1004,7 @@ const ServicesSection = ({ initialServices = [] }: ServicesSectionProps) => {
         }
       });
     };
-  }, [serviceMedia, activeIndex]);
+  }, [sectionVisible, serviceMedia]);
 
   return (
     <section ref={sectionRef} className="px-4 py-24">
@@ -1027,8 +1064,8 @@ const ServicesSection = ({ initialServices = [] }: ServicesSectionProps) => {
                       quality={95}
                       sizes="(max-width: 768px) 100vw, 50vw"
                       className="h-full w-full object-cover"
-                      priority={true}
-                      loading="eager"
+                      priority={sectionVisible}
+                      loading={sectionVisible ? "eager" : "lazy"}
                     />
                   )}
                 </>
