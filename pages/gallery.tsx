@@ -503,7 +503,7 @@ function ImageModal({
       onClick={onClose}
     >
       <div
-        className="relative  bg-black border border-white/20 overflow-hidden max-h-[90vh] flex flex-col"
+        className="relative bg-black border border-white/20 overflow-hidden max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <button
