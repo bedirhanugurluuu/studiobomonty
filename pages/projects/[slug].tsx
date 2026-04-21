@@ -4,19 +4,19 @@ import AnimatedText from "@/components/AnimatedText";
 import ButtonWithHoverArrow from "@/components/ButtonWithHoverArrow";
 import Link from "next/link";
 import { GetStaticProps, GetStaticPaths } from "next";
-import { fetchProjectBySlugSSR, fetchProjectsSSR, fetchProjectGallery, fetchProjectTeamMembers, normalizeImageUrl, Project, ProjectTeamMember } from "@/lib/api";
+import { fetchProjectBySlugSSR, fetchProjectsSSR, fetchProjectGallery, fetchProjectTeamMembers, normalizeImageUrl, Project, ProjectTeamMember, ProjectGalleryItem } from "@/lib/api";
 import SEO from "@/components/SEO";
 import FeaturedProjects from "@/components/FeaturedProjects";
 
 interface ProjectDetailProps {
   project: Project | null;
   moreProjects: Project[];
-  galleryImages: string[];
+  galleryItems: ProjectGalleryItem[];
   teamMembers: ProjectTeamMember[];
   featuredProjects: Project[];
 }
 
-export default function ProjectDetail({ project, moreProjects, galleryImages, teamMembers, featuredProjects }: ProjectDetailProps) {
+export default function ProjectDetail({ project, moreProjects, galleryItems, teamMembers, featuredProjects }: ProjectDetailProps) {
   if (!project) return <p>Project not found.</p>;
 
   // Animation state
@@ -42,6 +42,39 @@ export default function ProjectDetail({ project, moreProjects, galleryImages, te
 
   const joinedTitle = useMemo(() => titleWords.join(" "), [titleWords]);
   const joinedSubtitle = useMemo(() => subtitleWords.join(" "), [subtitleWords]);
+  const galleryMap = useMemo(() => {
+    return galleryItems.reduce<Record<number, string>>((acc, item) => {
+      acc[item.sort] = item.image_path;
+      return acc;
+    }, {});
+  }, [galleryItems]);
+  const horizontalImage = galleryMap[0];
+  const verticalLeftImage = galleryMap[2];
+  const verticalRightImage = galleryMap[3];
+  const additionalVerticalRows = useMemo(() => {
+    const rows: Array<{ leftOrder: number; rightOrder: number; leftImage?: string; rightImage?: string }> = [];
+    const rowMap = new Map<number, { leftOrder: number; rightOrder: number; leftImage?: string; rightImage?: string }>();
+
+    galleryItems
+      .filter((item) => item.sort >= 4)
+      .forEach((item) => {
+        const leftOrder = item.sort % 2 === 0 ? item.sort : item.sort - 1;
+        const rightOrder = leftOrder + 1;
+        const existing = rowMap.get(leftOrder) || { leftOrder, rightOrder };
+
+        if (item.sort % 2 === 0) {
+          existing.leftImage = item.image_path;
+        } else {
+          existing.rightImage = item.image_path;
+        }
+
+        rowMap.set(leftOrder, existing);
+      });
+
+    rowMap.forEach((value) => rows.push(value));
+    rows.sort((a, b) => a.leftOrder - b.leftOrder);
+    return rows;
+  }, [galleryItems]);
 
   // Trigger animations on mount
   useEffect(() => {
@@ -274,35 +307,85 @@ export default function ProjectDetail({ project, moreProjects, galleryImages, te
       {/* Gallery and Description Section */}
       <section className="px-4 py-4 md:py-0">
         <div className="flex flex-col gap-4">
-          {/* First 2 images side by side */}
-          {galleryImages.length >= 2 && (
+          {/* Order 0 - Full width (horizontal) */}
+          {horizontalImage && (
+            <div className="w-full relative aspect-[16/9]">
+              {horizontalImage.toLowerCase().endsWith('.mp4') || horizontalImage.toLowerCase().endsWith('.webm') ? (
+                <video
+                  src={normalizeImageUrl(horizontalImage)}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  controls={false}
+                  className="w-full object-cover h-full rounded-[10px]"
+                />
+              ) : (
+                <Image
+                  src={normalizeImageUrl(horizontalImage)}
+                  alt="Gallery image order 0"
+                  fill
+                  quality={90}
+                  className="object-cover rounded-[10px]"
+                  sizes="100vw"
+                />
+              )}
+            </div>
+          )}
+
+          {/* Order 2-3 - Side by side slots, allow one side empty */}
+          {(verticalLeftImage || verticalRightImage) && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {galleryImages.slice(0, 2).map((image, idx) => {
-                const isVideo = image.toLowerCase().endsWith('.mp4') || image.toLowerCase().endsWith('.webm');
-                return (
-                  <div key={idx} className="relative aspect-[3/4]">
-                    {isVideo ? (
-                      <video
-                        src={normalizeImageUrl(image)}
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                        className="w-full object-cover h-full rounded-[10px]"
-                      />
-                    ) : (
-                      <Image
-                        src={normalizeImageUrl(image)}
-                        alt={`Gallery image ${idx + 1}`}
-                        fill
-                        quality={90}
-                        className="object-cover rounded-[10px]"
-                        sizes="(max-width: 768px) 100vw, 50vw"
-                      />
-                    )}
-                  </div>
-                );
-              })}
+              <div className="relative aspect-[3/4]">
+                {verticalLeftImage ? (
+                  verticalLeftImage.toLowerCase().endsWith('.mp4') || verticalLeftImage.toLowerCase().endsWith('.webm') ? (
+                    <video
+                      src={normalizeImageUrl(verticalLeftImage)}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full object-cover h-full rounded-[10px]"
+                    />
+                  ) : (
+                    <Image
+                      src={normalizeImageUrl(verticalLeftImage)}
+                      alt="Gallery image order 2"
+                      fill
+                      quality={90}
+                      className="object-cover rounded-[10px]"
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                    />
+                  )
+                ) : (
+                  <div className="w-full h-full rounded-[10px] bg-transparent" />
+                )}
+              </div>
+              <div className="relative aspect-[3/4]">
+                {verticalRightImage ? (
+                  verticalRightImage.toLowerCase().endsWith('.mp4') || verticalRightImage.toLowerCase().endsWith('.webm') ? (
+                    <video
+                      src={normalizeImageUrl(verticalRightImage)}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full object-cover h-full rounded-[10px]"
+                    />
+                  ) : (
+                    <Image
+                      src={normalizeImageUrl(verticalRightImage)}
+                      alt="Gallery image order 3"
+                      fill
+                      quality={90}
+                      className="object-cover rounded-[10px]"
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                    />
+                  )
+                ) : (
+                  <div className="w-full h-full rounded-[10px] bg-transparent" />
+                )}
+              </div>
             </div>
           )}
 
@@ -330,104 +413,61 @@ export default function ProjectDetail({ project, moreProjects, galleryImages, te
             </div>
           )}
 
-          {/* Remaining gallery images with pattern: single, pair, single, pair... */}
-          {galleryImages.length > 2 && (() => {
-            const remainingImages = galleryImages.slice(2);
-            const rows = [];
-            let i = 0;
-            
-            while (i < remainingImages.length) {
-              // Single image (full width)
-              if (i < remainingImages.length) {
-                const image = remainingImages[i];
-                const isVideo = image.toLowerCase().endsWith('.mp4') || image.toLowerCase().endsWith('.webm');
-                
-                rows.push(
-                  <div key={`single-${i}`} className="w-full relative aspect-[16/9]">
-                    {isVideo ? (
-                      <video
-                        src={normalizeImageUrl(image)}
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                        controls={false}
-                        className="w-full object-cover h-full rounded-[10px]"
-                      />
-                    ) : (
-                      <Image
-                        src={normalizeImageUrl(image)}
-                        alt={`Gallery image ${i + 3}`}
-                        fill
-                        quality={90}
-                        className="object-cover rounded-[10px]"
-                        sizes="100vw"
-                      />
-                    )}
-                  </div>
-                );
-                i++;
-              }
-              
-              // Pair of images (side by side)
-              if (i < remainingImages.length && i + 1 < remainingImages.length) {
-                const firstImage = remainingImages[i];
-                const secondImage = remainingImages[i + 1];
-                const isFirstVideo = firstImage.toLowerCase().endsWith('.mp4') || firstImage.toLowerCase().endsWith('.webm');
-                const isSecondVideo = secondImage.toLowerCase().endsWith('.mp4') || secondImage.toLowerCase().endsWith('.webm');
-                
-                rows.push(
-                  <div key={`pair-${i}`} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="relative aspect-[3/4]">
-                      {isFirstVideo ? (
-                        <video
-                          src={normalizeImageUrl(firstImage)}
-                          autoPlay
-                          loop
-                          muted
-                          playsInline
-                          className="w-full object-cover h-full rounded-[10px]"
-                        />
-                      ) : (
-                        <Image
-                          src={normalizeImageUrl(firstImage)}
-                          alt={`Gallery image ${i + 3}`}
-                          fill
-                          quality={90}
-                          className="object-cover rounded-[10px]"
-                          sizes="(max-width: 768px) 100vw, 50vw"
-                        />
-                      )}
-                    </div>
-                    <div className="relative aspect-[3/4]">
-                      {isSecondVideo ? (
-                        <video
-                          src={normalizeImageUrl(secondImage)}
-                          autoPlay
-                          loop
-                          muted
-                          playsInline
-                          className="w-full object-cover h-full rounded-[10px]"
-                        />
-                      ) : (
-                        <Image
-                          src={normalizeImageUrl(secondImage)}
-                          alt={`Gallery image ${i + 4}`}
-                          fill
-                          quality={90}
-                          className="object-cover rounded-[10px]"
-                          sizes="(max-width: 768px) 100vw, 50vw"
-                        />
-                      )}
-                    </div>
-                  </div>
-                );
-                i += 2;
-              }
-            }
-            
-            return rows;
-          })()}
+          {/* Additional vertical rows: 4-5, 6-7, ... (even=left, odd=right) */}
+          {additionalVerticalRows.map((row) => (
+            <div key={`vertical-row-${row.leftOrder}`} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="relative aspect-[3/4]">
+                {row.leftImage ? (
+                  row.leftImage.toLowerCase().endsWith('.mp4') || row.leftImage.toLowerCase().endsWith('.webm') ? (
+                    <video
+                      src={normalizeImageUrl(row.leftImage)}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full object-cover h-full rounded-[10px]"
+                    />
+                  ) : (
+                    <Image
+                      src={normalizeImageUrl(row.leftImage)}
+                      alt={`Gallery image order ${row.leftOrder}`}
+                      fill
+                      quality={90}
+                      className="object-cover rounded-[10px]"
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                    />
+                  )
+                ) : (
+                  <div className="w-full h-full rounded-[10px] bg-transparent" />
+                )}
+              </div>
+              <div className="relative aspect-[3/4]">
+                {row.rightImage ? (
+                  row.rightImage.toLowerCase().endsWith('.mp4') || row.rightImage.toLowerCase().endsWith('.webm') ? (
+                    <video
+                      src={normalizeImageUrl(row.rightImage)}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full object-cover h-full rounded-[10px]"
+                    />
+                  ) : (
+                    <Image
+                      src={normalizeImageUrl(row.rightImage)}
+                      alt={`Gallery image order ${row.rightOrder}`}
+                      fill
+                      quality={90}
+                      className="object-cover rounded-[10px]"
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                    />
+                  )
+                ) : (
+                  <div className="w-full h-full rounded-[10px] bg-transparent" />
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -499,7 +539,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
       .sort((a, b) => (a.featured_order || 0) - (b.featured_order || 0));
     
     // Gallery images ve team members'ı parallel fetch et
-    const [galleryImages, teamMembers] = project ? await Promise.all([
+    const [galleryItems, teamMembers] = project ? await Promise.all([
       fetchProjectGallery(project.id),
       fetchProjectTeamMembers(project.id)
     ]) : [[], []];
@@ -508,7 +548,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
       props: {
         project,
         moreProjects,
-        galleryImages,
+        galleryItems,
         teamMembers,
         featuredProjects,
       },

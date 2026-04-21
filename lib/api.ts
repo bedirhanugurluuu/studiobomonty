@@ -346,7 +346,12 @@ export async function fetchProjectBySlug(slug: string): Promise<Project | null> 
   } as Project;
 }
 
-export async function fetchProjectGallery(projectId: string): Promise<string[]> {
+export interface ProjectGalleryItem {
+  image_path: string;
+  sort: number;
+}
+
+export async function fetchProjectGallery(projectId: string): Promise<ProjectGalleryItem[]> {
   const { data, error } = await supabase
     .from('project_gallery')
     .select('image_path, sort')
@@ -361,7 +366,10 @@ export async function fetchProjectGallery(projectId: string): Promise<string[]> 
     return sortA - sortB;
   });
   
-  return sorted.map(item => item.image_path) || [];
+  return sorted.map((item) => ({
+    image_path: item.image_path,
+    sort: typeof item.sort === 'number' ? item.sort : parseInt(item.sort) || 0,
+  })) || [];
 }
 
 export async function fetchProjectTeamMembers(projectId: string): Promise<ProjectTeamMember[]> {
