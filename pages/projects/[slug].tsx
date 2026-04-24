@@ -42,6 +42,67 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
 
   const joinedTitle = useMemo(() => titleWords.join(" "), [titleWords]);
   const joinedSubtitle = useMemo(() => subtitleWords.join(" "), [subtitleWords]);
+  const isHorizontalLayoutImage = (imagePath: string) => imagePath.includes("project-gallery-horizontal-");
+  const isVerticalLayoutImage = (imagePath: string) => imagePath.includes("project-gallery-vertical-");
+  const hasTaggedLayout = useMemo(
+    () => galleryItems.some((item) => isHorizontalLayoutImage(item.image_path) || isVerticalLayoutImage(item.image_path)),
+    [galleryItems]
+  );
+  const taggedLayoutBlocks = useMemo(() => {
+    if (!hasTaggedLayout) return [];
+
+    const sortedItems = [...galleryItems].sort((a, b) => a.sort - b.sort);
+    const blocks: Array<
+      | { type: "horizontal"; order: number; image: string }
+      | { type: "vertical"; order: number; leftImage?: string; rightImage?: string; leftOrder: number; rightOrder: number }
+    > = [];
+
+    for (let i = 0; i < sortedItems.length; i++) {
+      const item = sortedItems[i];
+
+      if (isHorizontalLayoutImage(item.image_path)) {
+        blocks.push({ type: "horizontal", order: item.sort, image: item.image_path });
+        continue;
+      }
+
+      if (isVerticalLayoutImage(item.image_path)) {
+        const nextItem = sortedItems[i + 1];
+        if (
+          nextItem &&
+          isVerticalLayoutImage(nextItem.image_path) &&
+          nextItem.sort === item.sort + 1
+        ) {
+          blocks.push({
+            type: "vertical",
+            order: item.sort,
+            leftImage: item.image_path,
+            rightImage: nextItem.image_path,
+            leftOrder: item.sort,
+            rightOrder: nextItem.sort,
+          });
+          i++;
+          continue;
+        }
+
+        const isEvenOrder = item.sort % 2 === 0;
+        blocks.push({
+          type: "vertical",
+          order: isEvenOrder ? item.sort : item.sort - 1,
+          leftImage: isEvenOrder ? item.image_path : undefined,
+          rightImage: isEvenOrder ? undefined : item.image_path,
+          leftOrder: isEvenOrder ? item.sort : item.sort - 1,
+          rightOrder: isEvenOrder ? item.sort + 1 : item.sort,
+        });
+        continue;
+      }
+
+      // Untagged kayıtlar tagged mode'da yatay fallback olarak gösterilir
+      blocks.push({ type: "horizontal", order: item.sort, image: item.image_path });
+    }
+
+    return blocks.sort((a, b) => a.order - b.order);
+  }, [galleryItems, hasTaggedLayout]);
+
   const galleryMap = useMemo(() => {
     return galleryItems.reduce<Record<number, string>>((acc, item) => {
       acc[item.sort] = item.image_path;
@@ -75,6 +136,258 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
     rows.sort((a, b) => a.leftOrder - b.leftOrder);
     return rows;
   }, [galleryItems]);
+
+  const galleryBlocks = useMemo(() => {
+    const blocks: Array<{ node: React.ReactNode; maxOrder: number }> = [];
+
+    if (hasTaggedLayout) {
+      taggedLayoutBlocks.forEach((block) => {
+        if (block.type === "horizontal") {
+          const isVideo = block.image.toLowerCase().endsWith('.mp4') || block.image.toLowerCase().endsWith('.webm');
+          blocks.push({
+            maxOrder: block.order,
+            node: <div key={`tagged-horizontal-${block.order}`} className="w-full relative aspect-[16/9]">
+              {isVideo ? (
+                <video
+                  src={normalizeImageUrl(block.image)}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  controls={false}
+                  className="w-full object-cover h-full rounded-[10px]"
+                />
+              ) : (
+                <Image
+                  src={normalizeImageUrl(block.image)}
+                  alt={`Gallery image order ${block.order}`}
+                  fill
+                  quality={90}
+                  className="object-cover rounded-[10px]"
+                  sizes="100vw"
+                />
+              )}
+            </div>
+          });
+          return;
+        }
+
+        blocks.push({
+          maxOrder: block.rightOrder,
+          node: <div key={`tagged-vertical-${block.leftOrder}-${block.rightOrder}`} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="relative aspect-[3/4]">
+              {block.leftImage ? (
+                block.leftImage.toLowerCase().endsWith('.mp4') || block.leftImage.toLowerCase().endsWith('.webm') ? (
+                  <video
+                    src={normalizeImageUrl(block.leftImage)}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full object-cover h-full rounded-[10px]"
+                  />
+                ) : (
+                  <Image
+                    src={normalizeImageUrl(block.leftImage)}
+                    alt={`Gallery image order ${block.leftOrder}`}
+                    fill
+                    quality={90}
+                    className="object-cover rounded-[10px]"
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                  />
+                )
+              ) : (
+                <div className="w-full h-full rounded-[10px] bg-transparent" />
+              )}
+            </div>
+            <div className="relative aspect-[3/4]">
+              {block.rightImage ? (
+                block.rightImage.toLowerCase().endsWith('.mp4') || block.rightImage.toLowerCase().endsWith('.webm') ? (
+                  <video
+                    src={normalizeImageUrl(block.rightImage)}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full object-cover h-full rounded-[10px]"
+                  />
+                ) : (
+                  <Image
+                    src={normalizeImageUrl(block.rightImage)}
+                    alt={`Gallery image order ${block.rightOrder}`}
+                    fill
+                    quality={90}
+                    className="object-cover rounded-[10px]"
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                  />
+                )
+              ) : (
+                <div className="w-full h-full rounded-[10px] bg-transparent" />
+              )}
+            </div>
+          </div>
+        });
+      });
+      return blocks;
+    }
+
+    if (horizontalImage) {
+      blocks.push({
+        maxOrder: 0,
+        node: <div key="legacy-horizontal-0" className="w-full relative aspect-[16/9]">
+          {horizontalImage.toLowerCase().endsWith('.mp4') || horizontalImage.toLowerCase().endsWith('.webm') ? (
+            <video
+              src={normalizeImageUrl(horizontalImage)}
+              autoPlay
+              loop
+              muted
+              playsInline
+              controls={false}
+              className="w-full object-cover h-full rounded-[10px]"
+            />
+          ) : (
+            <Image
+              src={normalizeImageUrl(horizontalImage)}
+              alt="Gallery image order 0"
+              fill
+              quality={90}
+              className="object-cover rounded-[10px]"
+              sizes="100vw"
+            />
+          )}
+        </div>
+      });
+    }
+
+    if (verticalLeftImage || verticalRightImage) {
+      blocks.push({
+        maxOrder: 3,
+        node: <div key="legacy-vertical-2-3" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="relative aspect-[3/4]">
+            {verticalLeftImage ? (
+              verticalLeftImage.toLowerCase().endsWith('.mp4') || verticalLeftImage.toLowerCase().endsWith('.webm') ? (
+                <video
+                  src={normalizeImageUrl(verticalLeftImage)}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-full object-cover h-full rounded-[10px]"
+                />
+              ) : (
+                <Image
+                  src={normalizeImageUrl(verticalLeftImage)}
+                  alt="Gallery image order 2"
+                  fill
+                  quality={90}
+                  className="object-cover rounded-[10px]"
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                />
+              )
+            ) : (
+              <div className="w-full h-full rounded-[10px] bg-transparent" />
+            )}
+          </div>
+          <div className="relative aspect-[3/4]">
+            {verticalRightImage ? (
+              verticalRightImage.toLowerCase().endsWith('.mp4') || verticalRightImage.toLowerCase().endsWith('.webm') ? (
+                <video
+                  src={normalizeImageUrl(verticalRightImage)}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-full object-cover h-full rounded-[10px]"
+                />
+              ) : (
+                <Image
+                  src={normalizeImageUrl(verticalRightImage)}
+                  alt="Gallery image order 3"
+                  fill
+                  quality={90}
+                  className="object-cover rounded-[10px]"
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                />
+              )
+            ) : (
+              <div className="w-full h-full rounded-[10px] bg-transparent" />
+            )}
+          </div>
+        </div>
+      });
+    }
+
+    additionalVerticalRows.forEach((row) => {
+      blocks.push({
+        maxOrder: row.rightOrder,
+        node: <div key={`vertical-row-${row.leftOrder}`} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="relative aspect-[3/4]">
+            {row.leftImage ? (
+              row.leftImage.toLowerCase().endsWith('.mp4') || row.leftImage.toLowerCase().endsWith('.webm') ? (
+                <video
+                  src={normalizeImageUrl(row.leftImage)}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-full object-cover h-full rounded-[10px]"
+                />
+              ) : (
+                <Image
+                  src={normalizeImageUrl(row.leftImage)}
+                  alt={`Gallery image order ${row.leftOrder}`}
+                  fill
+                  quality={90}
+                  className="object-cover rounded-[10px]"
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                />
+              )
+            ) : (
+              <div className="w-full h-full rounded-[10px] bg-transparent" />
+            )}
+          </div>
+          <div className="relative aspect-[3/4]">
+            {row.rightImage ? (
+              row.rightImage.toLowerCase().endsWith('.mp4') || row.rightImage.toLowerCase().endsWith('.webm') ? (
+                <video
+                  src={normalizeImageUrl(row.rightImage)}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-full object-cover h-full rounded-[10px]"
+                />
+              ) : (
+                <Image
+                  src={normalizeImageUrl(row.rightImage)}
+                  alt={`Gallery image order ${row.rightOrder}`}
+                  fill
+                  quality={90}
+                  className="object-cover rounded-[10px]"
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                />
+              )
+            ) : (
+              <div className="w-full h-full rounded-[10px] bg-transparent" />
+            )}
+          </div>
+        </div>
+      });
+    });
+
+    return blocks;
+  }, [
+    hasTaggedLayout,
+    taggedLayoutBlocks,
+    horizontalImage,
+    verticalLeftImage,
+    verticalRightImage,
+    additionalVerticalRows,
+  ]);
+  const descriptionInsertIndex = useMemo(() => {
+    const idx = galleryBlocks.findIndex((block) => block.maxOrder >= 3);
+    return idx >= 0 ? idx + 1 : galleryBlocks.length;
+  }, [galleryBlocks]);
 
   // Trigger animations on mount
   useEffect(() => {
@@ -307,87 +620,7 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
       {/* Gallery and Description Section */}
       <section className="px-4 py-4 md:py-0">
         <div className="flex flex-col gap-4">
-          {/* Order 0 - Full width (horizontal) */}
-          {horizontalImage && (
-            <div className="w-full relative aspect-[16/9]">
-              {horizontalImage.toLowerCase().endsWith('.mp4') || horizontalImage.toLowerCase().endsWith('.webm') ? (
-                <video
-                  src={normalizeImageUrl(horizontalImage)}
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  controls={false}
-                  className="w-full object-cover h-full rounded-[10px]"
-                />
-              ) : (
-                <Image
-                  src={normalizeImageUrl(horizontalImage)}
-                  alt="Gallery image order 0"
-                  fill
-                  quality={90}
-                  className="object-cover rounded-[10px]"
-                  sizes="100vw"
-                />
-              )}
-            </div>
-          )}
-
-          {/* Order 2-3 - Side by side slots, allow one side empty */}
-          {(verticalLeftImage || verticalRightImage) && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="relative aspect-[3/4]">
-                {verticalLeftImage ? (
-                  verticalLeftImage.toLowerCase().endsWith('.mp4') || verticalLeftImage.toLowerCase().endsWith('.webm') ? (
-                    <video
-                      src={normalizeImageUrl(verticalLeftImage)}
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="w-full object-cover h-full rounded-[10px]"
-                    />
-                  ) : (
-                    <Image
-                      src={normalizeImageUrl(verticalLeftImage)}
-                      alt="Gallery image order 2"
-                      fill
-                      quality={90}
-                      className="object-cover rounded-[10px]"
-                      sizes="(max-width: 768px) 100vw, 50vw"
-                    />
-                  )
-                ) : (
-                  <div className="w-full h-full rounded-[10px] bg-transparent" />
-                )}
-              </div>
-              <div className="relative aspect-[3/4]">
-                {verticalRightImage ? (
-                  verticalRightImage.toLowerCase().endsWith('.mp4') || verticalRightImage.toLowerCase().endsWith('.webm') ? (
-                    <video
-                      src={normalizeImageUrl(verticalRightImage)}
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="w-full object-cover h-full rounded-[10px]"
-                    />
-                  ) : (
-                    <Image
-                      src={normalizeImageUrl(verticalRightImage)}
-                      alt="Gallery image order 3"
-                      fill
-                      quality={90}
-                      className="object-cover rounded-[10px]"
-                      sizes="(max-width: 768px) 100vw, 50vw"
-                    />
-                  )
-                ) : (
-                  <div className="w-full h-full rounded-[10px] bg-transparent" />
-                )}
-              </div>
-            </div>
-          )}
+          {galleryBlocks.slice(0, descriptionInsertIndex).map((block) => block.node)}
 
           {/* Description */}
           {project.description && (
@@ -413,61 +646,7 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
             </div>
           )}
 
-          {/* Additional vertical rows: 4-5, 6-7, ... (even=left, odd=right) */}
-          {additionalVerticalRows.map((row) => (
-            <div key={`vertical-row-${row.leftOrder}`} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="relative aspect-[3/4]">
-                {row.leftImage ? (
-                  row.leftImage.toLowerCase().endsWith('.mp4') || row.leftImage.toLowerCase().endsWith('.webm') ? (
-                    <video
-                      src={normalizeImageUrl(row.leftImage)}
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="w-full object-cover h-full rounded-[10px]"
-                    />
-                  ) : (
-                    <Image
-                      src={normalizeImageUrl(row.leftImage)}
-                      alt={`Gallery image order ${row.leftOrder}`}
-                      fill
-                      quality={90}
-                      className="object-cover rounded-[10px]"
-                      sizes="(max-width: 768px) 100vw, 50vw"
-                    />
-                  )
-                ) : (
-                  <div className="w-full h-full rounded-[10px] bg-transparent" />
-                )}
-              </div>
-              <div className="relative aspect-[3/4]">
-                {row.rightImage ? (
-                  row.rightImage.toLowerCase().endsWith('.mp4') || row.rightImage.toLowerCase().endsWith('.webm') ? (
-                    <video
-                      src={normalizeImageUrl(row.rightImage)}
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="w-full object-cover h-full rounded-[10px]"
-                    />
-                  ) : (
-                    <Image
-                      src={normalizeImageUrl(row.rightImage)}
-                      alt={`Gallery image order ${row.rightOrder}`}
-                      fill
-                      quality={90}
-                      className="object-cover rounded-[10px]"
-                      sizes="(max-width: 768px) 100vw, 50vw"
-                    />
-                  )
-                ) : (
-                  <div className="w-full h-full rounded-[10px] bg-transparent" />
-                )}
-              </div>
-            </div>
-          ))}
+          {galleryBlocks.slice(descriptionInsertIndex).map((block) => block.node)}
         </div>
       </section>
 
