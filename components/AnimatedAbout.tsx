@@ -26,6 +26,16 @@ export default function AnimatedAbout({ initialContent, initialProjects = [], in
     content: "A collective of visionaries shaping tomorrow, where creativity and innovation intersect.",
     description: "A collective of visionaries shaping tomorrow, where creativity and innovation intersect.",
     main_text: "A collective of visionaries shaping tomorrow, where creativity and innovation intersect. Our studio is built on the belief that bold ideas and meticulous execution drive meaningful design.",
+    about_us_text: "A collective of visionaries shaping tomorrow, where creativity and innovation intersect. Our studio is built on the belief that bold ideas and meticulous execution drive meaningful design.",
+    refined_values_title: "REFINED STUDIO BOMONTY VALUES",
+    refined_value_1: "Craft with intention",
+    refined_value_2: "Radical collaboration",
+    refined_value_3: "Clarity in every detail",
+    refined_value_4: "System-first thinking",
+    refined_value_5: "Measured creativity",
+    refined_value_6: "Long-term impact",
+    show_recognition: true,
+    show_clients: true,
     image_path: "",
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
@@ -111,6 +121,33 @@ export default function AnimatedAbout({ initialContent, initialProjects = [], in
     }
   }, [initialProjects.length]);
 
+  const refinedValues = useMemo(
+    () => [
+      content.refined_value_1,
+      content.refined_value_2,
+      content.refined_value_3,
+      content.refined_value_4,
+      content.refined_value_5,
+      content.refined_value_6,
+    ],
+    [
+      content.refined_value_1,
+      content.refined_value_2,
+      content.refined_value_3,
+      content.refined_value_4,
+      content.refined_value_5,
+      content.refined_value_6,
+    ]
+  );
+
+  const visibleRefinedValues = useMemo(
+    () =>
+      refinedValues
+        .map((value, index) => ({ value: (value || "").trim(), index }))
+        .filter((item) => item.value.length > 0),
+    [refinedValues]
+  );
+
   return (
     <div ref={containerRef} className="w-full">
       {/* Hero Section */}
@@ -166,32 +203,70 @@ export default function AnimatedAbout({ initialContent, initialProjects = [], in
         </div>
       </div>
 
-      {/* Offices Section */}
+      {/* About Us Section */}
       <div className="w-full">
         <div
-          className="relative w-full overflow-hidden px-4 pt-25 pb-5 md:pb-55"
+          className="relative w-full overflow-hidden px-4 pt-15 md:pt-25 pb-5 md:pb-55"
         >
-          <h2 className="text-sm md:text-xl font-medium mb-15">
-            OFFICES
-          </h2>
-          <div className="flex flex-col gap-2">
-            <span className="text-[100px] md:text-[160px] leading-[100px] md:leading-[160px] font-medium" >IST</span>
-            <p className="opacity-50 text-sm font-medium" style={{ lineHeight: "16px" }}>125 W 26th Street, 9th Floor <br /> New York, NY 10001</p>
+          <div className="relative grid gap-12 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,2.9fr)_minmax(0,0.9fr)]">
+            <div className="flex items-start">
+              <h2 className="text-sm md:text-xl font-medium">
+                ABOUT US
+              </h2>
+            </div>
+            <div className="max-w-4xl">
+              <p className="whitespace-pre-line text-base md:text-2xl font-medium ">
+                {content.about_us_text || content.main_text}
+              </p>
+            </div>
+            <div />
           </div>
         </div>
       </div>
+
+      {/* Refined Values Section */}
+      {visibleRefinedValues.length > 0 && (
+        <div className="w-full">
+          <div className="relative w-full overflow-hidden px-4 md:pb-40">
+            <div className="relative grid gap-12 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,2.9fr)_minmax(0,0.9fr)]">
+              <div className="flex items-start">
+                <h2 className="text-sm md:text-xl font-medium max-w-[250px]">
+                  {content.refined_values_title || "REFINED STUDIO BOMONTY VALUES"}
+                </h2>
+              </div>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-16 md:grid-cols-3">
+                {visibleRefinedValues.map(({ value, index }) => (
+                  <div key={`refined-value-${index}`} className="flex flex-col gap-1">
+                    <span className="text-sm opacity-80">
+                      {(index + 1).toString().padStart(2, "0")} .
+                    </span>
+                    <p className="whitespace-pre-line text-base md:text-xl font-medium">
+                      {value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <div />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Services Section */}
       <ServicesSection initialServices={initialServices} />
 
       {/* Recognition Section */}
-      <RecognitionSection initialRecognition={initialRecognition} initialRecognitionItems={initialRecognitionItems} />
+      {content.show_recognition !== false && (
+        <RecognitionSection initialRecognition={initialRecognition} initialRecognitionItems={initialRecognitionItems} />
+      )}
 
       {/* Clients Section */}
-      <ClientsSection initialClientsSettings={initialClientsSettings} initialClients={initialClients} />
+      {content.show_clients !== false && (
+        <ClientsSection initialClientsSettings={initialClientsSettings} initialClients={initialClients} />
+      )}
 
       {/* From The Journal Section */}
-      <FromTheJournal />
+      {/* <FromTheJournal /> */}
 
       {/* Latest Projects Banner Section */}
       <LatestProjectsBannerSection initialBanner={initialLatestProjectsBanner} />
@@ -800,10 +875,8 @@ interface ServicesSectionProps {
 const ServicesSection = ({ initialServices = [] }: ServicesSectionProps) => {
   const [services, setServices] = useState<Service[]>(initialServices);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const [intersectionRatios, setIntersectionRatios] = useState<Map<number, number>>(new Map());
   const [isMobile, setIsMobile] = useState(false);
   const sectionRef = useRef<HTMLElement | null>(null);
-  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
     if (initialServices.length === 0) {
@@ -837,84 +910,19 @@ const ServicesSection = ({ initialServices = [] }: ServicesSectionProps) => {
     };
   }, []);
 
-  // IntersectionObserver to track which service is currently in view
   useEffect(() => {
-    if (services.length === 0) return;
-
-    const ratios = new Map<number, number>();
-
-    // Section'ın görünürlüğünü kontrol et
-    const sectionObserver = new IntersectionObserver(
-      (entries) => {
-        const sectionEntry = entries[0];
-        if (!sectionEntry.isIntersecting) {
-          // Section görünür değilse hiçbir servisi aktif yapma
-          setActiveIndex(null);
-          return;
-        }
-      },
-      {
-        root: null,
-        threshold: 0.1,
-      }
-    );
-
-    // Her servisin görünürlüğünü kontrol et
-    const serviceObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          const index = Number(entry.target.getAttribute("data-index"));
-          if (!Number.isNaN(index)) {
-            ratios.set(index, entry.intersectionRatio);
-          }
-        });
-
-        setIntersectionRatios(new Map(ratios));
-
-        // En yüksek intersection ratio'ya sahip servisi bul
-        let maxRatio = 0;
-        let maxIndex: number | null = null;
-
-        ratios.forEach((ratio, index) => {
-          if (ratio > maxRatio && ratio > 0.1) {
-            maxRatio = ratio;
-            maxIndex = index;
-          }
-        });
-
-        setActiveIndex(maxIndex);
-      },
-      {
-        root: null,
-        threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
-        rootMargin: isMobile ? "-20% 0px -30% 0px" : "-30% 0px -30% 0px",
-      }
-    );
-
-    // Section'ı gözle
-    if (sectionRef.current) {
-      sectionObserver.observe(sectionRef.current);
+    if (services.length === 0) {
+      setActiveIndex(null);
+      return;
     }
 
-    // Servisleri gözle
-    itemRefs.current.forEach((el) => {
-      if (el) serviceObserver.observe(el);
-    });
-
-    return () => {
-      if (sectionRef.current) {
-        sectionObserver.unobserve(sectionRef.current);
+    setActiveIndex((prev) => {
+      if (prev === null || prev < 0 || prev >= services.length) {
+        return 0;
       }
-      itemRefs.current.forEach((el) => {
-        if (el) serviceObserver.unobserve(el);
-      });
-    };
-  }, [services.length, isMobile]);
-
-  const activeService = useMemo(() => {
-    if (services.length === 0 || activeIndex === null) return null;
-    return services[activeIndex];
-  }, [activeIndex, services]);
+      return prev;
+    });
+  }, [services]);
 
   // Pre-process all media URLs and types
   const serviceMedia = useMemo(() => {
@@ -1007,7 +1015,7 @@ const ServicesSection = ({ initialServices = [] }: ServicesSectionProps) => {
   }, [sectionVisible, serviceMedia]);
 
   return (
-    <section ref={sectionRef} className="px-4 py-24">
+    <section ref={sectionRef} className="px-4 py-15 md:py-24">
       <div className="relative grid gap-12 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,2.9fr)_minmax(0,0.9fr)]">
         {/* Left: Services Title */}
         <div className="flex items-start">
@@ -1020,14 +1028,12 @@ const ServicesSection = ({ initialServices = [] }: ServicesSectionProps) => {
             {services.map((service, index) => (
               <div
                 key={service.id}
-                ref={(el) => {
-                  itemRefs.current[index] = el;
-                }}
-                data-index={index}
                 className="group flex flex-col text-white transition-opacity duration-300 py-1 md:py-2"
+                onMouseEnter={() => setActiveIndex(index)}
+                onFocus={() => setActiveIndex(index)}
               >
                 <span
-                  className={`text-3xl font-medium uppercase leading-[0.9] transition-[opacity,transform] duration-500 ease-out md:text-6xl ${
+                  className={`text-3xl font-medium cursor-default uppercase leading-[0.9] transition-[opacity,transform] duration-500 ease-out md:text-6xl ${
                     activeIndex === index ? "opacity-100" : "opacity-10"
                   }`}
                 >

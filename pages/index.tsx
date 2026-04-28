@@ -45,7 +45,7 @@ export default function Home({ featuredProjects, introBanner }: HomeProps) {
       <div>
         <IntroBanner initialBanner={introBanner} />
         <FeaturedProjects initialProjects={featuredProjects} />
-        <FromTheJournal />
+        {/* <FromTheJournal /> */}
         <AboutBanner />
       </div>
     </>

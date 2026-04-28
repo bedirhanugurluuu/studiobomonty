@@ -56,6 +56,16 @@ export interface AboutContent {
   content: string;
   description: string;
   main_text: string;
+  about_us_text?: string;
+  refined_values_title?: string;
+  refined_value_1?: string;
+  refined_value_2?: string;
+  refined_value_3?: string;
+  refined_value_4?: string;
+  refined_value_5?: string;
+  refined_value_6?: string;
+  show_recognition?: boolean;
+  show_clients?: boolean;
   image_path?: string;
   created_at: string;
   updated_at: string;
