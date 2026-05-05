@@ -175,7 +175,7 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
         blocks.push({
           maxOrder: block.rightOrder,
           node: <div key={`tagged-vertical-${block.leftOrder}-${block.rightOrder}`} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="relative aspect-[3/4]">
+            <div className={`relative aspect-[3/4]${block.leftImage ? "" : " hidden md:block"}`}>
               {block.leftImage ? (
                 block.leftImage.toLowerCase().endsWith('.mp4') || block.leftImage.toLowerCase().endsWith('.webm') ? (
                   <video
@@ -200,7 +200,7 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
                 <div className="w-full h-full rounded-[10px] bg-transparent" />
               )}
             </div>
-            <div className="relative aspect-[3/4]">
+            <div className={`relative aspect-[3/4]${block.rightImage ? "" : " hidden md:block"}`}>
               {block.rightImage ? (
                 block.rightImage.toLowerCase().endsWith('.mp4') || block.rightImage.toLowerCase().endsWith('.webm') ? (
                   <video
@@ -263,7 +263,7 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
       blocks.push({
         maxOrder: 3,
         node: <div key="legacy-vertical-2-3" className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="relative aspect-[3/4]">
+          <div className={`relative aspect-[3/4]${verticalLeftImage ? "" : " hidden md:block"}`}>
             {verticalLeftImage ? (
               verticalLeftImage.toLowerCase().endsWith('.mp4') || verticalLeftImage.toLowerCase().endsWith('.webm') ? (
                 <video
@@ -288,7 +288,7 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
               <div className="w-full h-full rounded-[10px] bg-transparent" />
             )}
           </div>
-          <div className="relative aspect-[3/4]">
+          <div className={`relative aspect-[3/4]${verticalRightImage ? "" : " hidden md:block"}`}>
             {verticalRightImage ? (
               verticalRightImage.toLowerCase().endsWith('.mp4') || verticalRightImage.toLowerCase().endsWith('.webm') ? (
                 <video
@@ -321,7 +321,7 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
       blocks.push({
         maxOrder: row.rightOrder,
         node: <div key={`vertical-row-${row.leftOrder}`} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="relative aspect-[3/4]">
+          <div className={`relative aspect-[3/4]${row.leftImage ? "" : " hidden md:block"}`}>
             {row.leftImage ? (
               row.leftImage.toLowerCase().endsWith('.mp4') || row.leftImage.toLowerCase().endsWith('.webm') ? (
                 <video
@@ -346,7 +346,7 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
               <div className="w-full h-full rounded-[10px] bg-transparent" />
             )}
           </div>
-          <div className="relative aspect-[3/4]">
+          <div className={`relative aspect-[3/4]${row.rightImage ? "" : " hidden md:block"}`}>
             {row.rightImage ? (
               row.rightImage.toLowerCase().endsWith('.mp4') || row.rightImage.toLowerCase().endsWith('.webm') ? (
                 <video
@@ -385,8 +385,8 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
     additionalVerticalRows,
   ]);
   const descriptionInsertIndex = useMemo(() => {
-    const idx = galleryBlocks.findIndex((block) => block.maxOrder >= 3);
-    return idx >= 0 ? idx + 1 : galleryBlocks.length;
+    if (galleryBlocks.length === 0) return 0;
+    return 1;
   }, [galleryBlocks]);
 
   // Trigger animations on mount
@@ -618,7 +618,7 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
       </section>
 
       {/* Gallery and Description Section */}
-      <section className="px-4 py-4 md:py-0">
+      <section className="px-4 py-4 lg:py-0">
         <div className="flex flex-col gap-4">
           {galleryBlocks.slice(0, descriptionInsertIndex).map((block) => block.node)}
 
