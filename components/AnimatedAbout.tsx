@@ -34,6 +34,12 @@ export default function AnimatedAbout({ initialContent, initialProjects = [], in
     refined_value_4: "System-first thinking",
     refined_value_5: "Measured creativity",
     refined_value_6: "Long-term impact",
+    refined_value_image_1: "",
+    refined_value_image_2: "",
+    refined_value_image_3: "",
+    refined_value_image_4: "",
+    refined_value_image_5: "",
+    refined_value_image_6: "",
     show_recognition: true,
     show_clients: true,
     image_path: "",
@@ -147,6 +153,114 @@ export default function AnimatedAbout({ initialContent, initialProjects = [], in
         .filter((item) => item.value.length > 0),
     [refinedValues]
   );
+  const refinedValueImages = useMemo(
+    () => [
+      content.refined_value_image_1,
+      content.refined_value_image_2,
+      content.refined_value_image_3,
+      content.refined_value_image_4,
+      content.refined_value_image_5,
+      content.refined_value_image_6,
+    ],
+    [
+      content.refined_value_image_1,
+      content.refined_value_image_2,
+      content.refined_value_image_3,
+      content.refined_value_image_4,
+      content.refined_value_image_5,
+      content.refined_value_image_6,
+    ]
+  );
+
+  const visibleRefinedItems = useMemo(
+    () =>
+      visibleRefinedValues.map(({ value, index }) => ({
+        value,
+        index,
+        image: (refinedValueImages[index] || "").trim(),
+      })),
+    [visibleRefinedValues, refinedValueImages]
+  );
+  const [activeRefinedValueIndex, setActiveRefinedValueIndex] = useState<number>(0);
+
+  useEffect(() => {
+    if (visibleRefinedItems.length === 0) {
+      setActiveRefinedValueIndex(0);
+      return;
+    }
+
+    setActiveRefinedValueIndex((prev) => {
+      if (prev < 0 || prev >= visibleRefinedItems.length) return 0;
+      return prev;
+    });
+  }, [visibleRefinedItems]);
+
+  const activeRefinedItem = visibleRefinedItems[activeRefinedValueIndex] || null;
+  const activeRefinedImageUrl = activeRefinedItem?.image
+    ? normalizeImageUrl(activeRefinedItem.image)
+    : "";
+  const activeRefinedIsVideo =
+    activeRefinedImageUrl &&
+    (activeRefinedImageUrl.toLowerCase().endsWith(".mp4") ||
+      activeRefinedImageUrl.toLowerCase().endsWith(".webm") ||
+      activeRefinedImageUrl.toLowerCase().endsWith(".mov"));
+  const [refinedSectionVisible, setRefinedSectionVisible] = useState(false);
+  const refinedSectionRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!refinedSectionRef.current || visibleRefinedItems.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setRefinedSectionVisible(true);
+        }
+      },
+      {
+        threshold: 0.1,
+        rootMargin: "200px 0px",
+      }
+    );
+
+    observer.observe(refinedSectionRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [visibleRefinedItems.length]);
+
+  useEffect(() => {
+    if (!refinedSectionVisible || typeof window === "undefined") return;
+
+    const links: HTMLLinkElement[] = [];
+
+    visibleRefinedItems.forEach((item) => {
+      const mediaUrl = normalizeImageUrl(item.image || "");
+      const isVideo =
+        mediaUrl &&
+        (mediaUrl.toLowerCase().endsWith(".mp4") ||
+          mediaUrl.toLowerCase().endsWith(".webm") ||
+          mediaUrl.toLowerCase().endsWith(".mov"));
+
+      if (!mediaUrl || isVideo) return;
+
+      const link = document.createElement("link");
+      link.rel = "preload";
+      link.as = "image";
+      link.href = mediaUrl;
+      (link as any).fetchPriority = "high";
+      document.head.appendChild(link);
+      links.push(link);
+    });
+
+    return () => {
+      links.forEach((link) => {
+        if (document.head.contains(link)) {
+          document.head.removeChild(link);
+        }
+      });
+    };
+  }, [refinedSectionVisible, visibleRefinedItems]);
 
   return (
     <div ref={containerRef} className="w-full">
@@ -226,7 +340,7 @@ export default function AnimatedAbout({ initialContent, initialProjects = [], in
 
       {/* Refined Values Section */}
       {visibleRefinedValues.length > 0 && (
-        <div className="w-full">
+        <div ref={refinedSectionRef} className="w-full">
           <div className="relative w-full overflow-hidden px-4 md:pb-40">
             <div className="relative grid gap-12 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,2.9fr)_minmax(0,0.9fr)]">
               <div className="flex items-start">
@@ -235,18 +349,90 @@ export default function AnimatedAbout({ initialContent, initialProjects = [], in
                 </h2>
               </div>
               <div className="grid grid-cols-2 gap-x-8 gap-y-16 md:grid-cols-3">
-                {visibleRefinedValues.map(({ value, index }) => (
+                {visibleRefinedItems.map(({ value, index }, itemIndex) => (
                   <div key={`refined-value-${index}`} className="flex flex-col gap-1">
-                    <span className="text-sm opacity-80">
+                    <span className="text-sm opacity-80 cursor-default">
                       {(index + 1).toString().padStart(2, "0")} .
                     </span>
-                    <p className="whitespace-pre-line text-base md:text-xl font-medium">
+                    <p
+                      className={`whitespace-pre-line text-base cursor-default md:text-xl font-medium transition-opacity duration-300 ${
+                        activeRefinedValueIndex === itemIndex ? "opacity-100" : "opacity-40"
+                      }`}
+                      onMouseEnter={() => setActiveRefinedValueIndex(itemIndex)}
+                      onFocus={() => setActiveRefinedValueIndex(itemIndex)}
+                    >
                       {value}
                     </p>
                   </div>
                 ))}
               </div>
-              <div />
+              <div className="hidden lg:block">
+                <div className="sticky top-[100px] w-full overflow-hidden rounded-[10px] bg-white/10 aspect-[3/4]">
+                  {activeRefinedImageUrl ? (
+                    activeRefinedIsVideo ? (
+                      <video
+                        key={`refined-value-video-${activeRefinedValueIndex}`}
+                        src={activeRefinedImageUrl}
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <Image
+                        key={`refined-value-image-${activeRefinedValueIndex}`}
+                        src={activeRefinedImageUrl}
+                        alt={activeRefinedItem?.value || "Refined value image"}
+                        width={800}
+                        height={1000}
+                        quality={90}
+                        sizes="(max-width: 1024px) 100vw, 25vw"
+                        className="h-full w-full object-cover"
+                        priority={refinedSectionVisible}
+                        loading={refinedSectionVisible ? "eager" : "lazy"}
+                      />
+                    )
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-xs uppercase text-white/40">
+                      No image
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="mt-8 block lg:hidden">
+              <div className="w-full overflow-hidden rounded-[10px] bg-white/10 aspect-[4/5]">
+                {activeRefinedImageUrl ? (
+                  activeRefinedIsVideo ? (
+                    <video
+                      key={`refined-value-mobile-video-${activeRefinedValueIndex}`}
+                      src={activeRefinedImageUrl}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <img
+                      key={`refined-value-mobile-image-${activeRefinedValueIndex}`}
+                      src={activeRefinedImageUrl}
+                      alt={activeRefinedItem?.value || "Refined value image"}
+                      width={1200}
+                      height={1500}
+                      sizes="100vw"
+                      className="h-full w-full object-cover"
+                      loading={refinedSectionVisible ? "eager" : "lazy"}
+                      fetchPriority={refinedSectionVisible ? "high" : "auto"}
+                    />
+                  )
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-xs uppercase text-white/40">
+                    No image
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

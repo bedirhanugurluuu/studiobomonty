@@ -12,7 +12,7 @@ export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [istanbulTime, setIstanbulTime] = useState("");
-  const { settings: headerSettings, loading: headerLoading } = useHeaderSettings();
+  const { settings: headerSettings } = useHeaderSettings();
   const pathname = usePathname();
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dropdownContentRef = useRef<HTMLDivElement | null>(null);
@@ -58,16 +58,21 @@ export default function Header() {
     false;
 
   // Menü öğelerini sadece DB'den veri geldiğinde göster
+  const fallbackNavItems = useMemo(
+    () => [
+      { id: "fallback-1", href: "/projects", label: "PROJECTS", order: 1 },
+      { id: "fallback-2", href: "/about", label: "ABOUT", order: 2 },
+      { id: "fallback-3", href: "/archive", label: "ARCHIVE", order: 3 },
+    ],
+    []
+  );
+
   const navItems = useMemo(() => {
-    // Loading durumunda veya settings null ise boş döndür
-    if (headerLoading || !headerSettings) {
-      return [];
-    }
     if (headerSettings?.menu_items && headerSettings.menu_items.length > 0) {
       return [...headerSettings.menu_items].sort((a: any, b: any) => a.order - b.order);
     }
-    return [];
-  }, [headerSettings?.menu_items, headerLoading, headerSettings]);
+    return fallbackNavItems;
+  }, [headerSettings?.menu_items, headerSettings, fallbackNavItems]);
 
   const primaryNavItems = navItems.slice(0, 3);
   const activeBackground = scrolled || menuOpen || isDarkText;
@@ -189,7 +194,7 @@ export default function Header() {
               menuOpen && "opacity-0 pointer-events-none"
             )}
           >
-            {mounted && primaryNavItems.length > 0 && primaryNavItems.map((item: any) => (
+            {primaryNavItems.length > 0 && primaryNavItems.map((item: any) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -247,7 +252,7 @@ export default function Header() {
             ref={dropdownContentRef}
             className="grid gap-6 md:gap-12 pt-4 pb-4 text-xs uppercase md:grid-cols-2"
           >
-            {navItems.length > 0 && mounted ? (
+            {navItems.length > 0 ? (
               <nav className="flex flex-col gap-1 text-sm font-medium md:col-span-2">
                 {navItems.map((item: any, index: number) => (
                   <div key={item.href} className="overflow-hidden">
