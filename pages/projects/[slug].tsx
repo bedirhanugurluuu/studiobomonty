@@ -42,8 +42,10 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
 
   const joinedTitle = useMemo(() => titleWords.join(" "), [titleWords]);
   const joinedSubtitle = useMemo(() => subtitleWords.join(" "), [subtitleWords]);
-  const isHorizontalLayoutImage = (imagePath: string) => imagePath.includes("project-gallery-horizontal-");
-  const isVerticalLayoutImage = (imagePath: string) => imagePath.includes("project-gallery-vertical-");
+  const isHorizontalLayoutImage = (imagePath: string) =>
+    imagePath.toLowerCase().includes("project-gallery-horizontal-");
+  const isVerticalLayoutImage = (imagePath: string) =>
+    imagePath.toLowerCase().includes("project-gallery-vertical-");
   const hasTaggedLayout = useMemo(
     () => galleryItems.some((item) => isHorizontalLayoutImage(item.image_path) || isVerticalLayoutImage(item.image_path)),
     [galleryItems]
@@ -158,11 +160,9 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
                   className="w-full object-cover h-full rounded-[10px]"
                 />
               ) : (
-                <Image
+                <img
                   src={normalizeImageUrl(block.image)}
                   alt={`Gallery image order ${block.order}`}
-                  fill
-                  quality={90}
                   className="object-cover rounded-[10px]"
                   sizes="100vw"
                 />
@@ -187,11 +187,9 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
                     className="w-full object-cover h-full rounded-[10px]"
                   />
                 ) : (
-                  <Image
+                  <img  
                     src={normalizeImageUrl(block.leftImage)}
                     alt={`Gallery image order ${block.leftOrder}`}
-                    fill
-                    quality={90}
                     className="object-cover rounded-[10px]"
                     sizes="(max-width: 768px) 100vw, 50vw"
                   />
@@ -212,11 +210,9 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
                     className="w-full object-cover h-full rounded-[10px]"
                   />
                 ) : (
-                  <Image
+                  <img
                     src={normalizeImageUrl(block.rightImage)}
                     alt={`Gallery image order ${block.rightOrder}`}
-                    fill
-                    quality={90}
                     className="object-cover rounded-[10px]"
                     sizes="(max-width: 768px) 100vw, 50vw"
                   />
@@ -246,11 +242,9 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
               className="w-full object-cover h-full rounded-[10px]"
             />
           ) : (
-            <Image
+            <img
               src={normalizeImageUrl(horizontalImage)}
               alt="Gallery image order 0"
-              fill
-              quality={90}
               className="object-cover rounded-[10px]"
               sizes="100vw"
             />
@@ -275,11 +269,9 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
                   className="w-full object-cover h-full rounded-[10px]"
                 />
               ) : (
-                <Image
+                <img
                   src={normalizeImageUrl(verticalLeftImage)}
                   alt="Gallery image order 2"
-                  fill
-                  quality={90}
                   className="object-cover rounded-[10px]"
                   sizes="(max-width: 768px) 100vw, 50vw"
                 />
@@ -300,11 +292,9 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
                   className="w-full object-cover h-full rounded-[10px]"
                 />
               ) : (
-                <Image
+                <img
                   src={normalizeImageUrl(verticalRightImage)}
                   alt="Gallery image order 3"
-                  fill
-                  quality={90}
                   className="object-cover rounded-[10px]"
                   sizes="(max-width: 768px) 100vw, 50vw"
                 />
@@ -333,11 +323,9 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
                   className="w-full object-cover h-full rounded-[10px]"
                 />
               ) : (
-                <Image
+                <img
                   src={normalizeImageUrl(row.leftImage)}
                   alt={`Gallery image order ${row.leftOrder}`}
-                  fill
-                  quality={90}
                   className="object-cover rounded-[10px]"
                   sizes="(max-width: 768px) 100vw, 50vw"
                 />
@@ -358,11 +346,9 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
                   className="w-full object-cover h-full rounded-[10px]"
                 />
               ) : (
-                <Image
+                <img
                   src={normalizeImageUrl(row.rightImage)}
                   alt={`Gallery image order ${row.rightOrder}`}
-                  fill
-                  quality={90}
                   className="object-cover rounded-[10px]"
                   sizes="(max-width: 768px) 100vw, 50vw"
                 />
@@ -440,42 +426,35 @@ export default function ProjectDetail({ project, moreProjects, galleryItems, tea
         <div className="relative w-full overflow-hidden md:rounded-[10px]" style={{ height: "calc(100vh - 30px)" }}>
           {/* Desktop Banner */}
           {project.banner_media && (
-            <Image
+            <img
               src={normalizeImageUrl(project.banner_media)}
               alt="Banner"
-              fill
-              quality={95}
               sizes="100vw"
               style={{ objectFit: "cover", minHeight: "calc(100vh - 30px)" }}
-              priority
+              fetchPriority="high"
               className="object-cover hidden lg:block"
             />
           )}
           
           {/* Mobile Banner */}
           {project.mobile_image_url && (
-            <Image
+            <img
               src={normalizeImageUrl(project.mobile_image_url)}
               alt="Banner"
-              fill
-              quality={95}
               sizes="100vw"
               style={{ objectFit: "cover", minHeight: "calc(100vh - 30px)" }}
-              priority
+              fetchPriority="high"
               className="object-cover block lg:hidden"
             />
           )}
           
           {/* Fallback: If no mobile image, show desktop on mobile too */}
           {!project.mobile_image_url && project.banner_media && (
-            <Image
+            <img
               src={normalizeImageUrl(project.banner_media)}
               alt="Banner"
-              fill
-              quality={95}
               sizes="100vw"
               style={{ objectFit: "cover", minHeight: "calc(100vh - 30px)" }}
-              priority
               className="object-cover block lg:hidden"
             />
           )}
